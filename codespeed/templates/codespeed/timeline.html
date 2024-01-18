@@ -54,7 +54,7 @@
 </div>
 <div id="benchmark" class="sidebox">
   <div class="boxhead"><h2>Benchmark</h2></div>
-  <div class="boxbody">{% ifnotequal benchmarks|length 1 %}
+  <div class="boxbody">{% if benchmarks|length != 1 %}
   <ul>
     <li>
       <input id="benchmarkgrid" type="radio" name="benchmark" value="grid" />
@@ -64,7 +64,7 @@
       <input id="b_show_none" type="radio" name="benchmark" value="show_none" />
       <label for="b_show_none">Display none</label>
     </li>
-  </ul>{% endifnotequal %}
+  </ul>{% endif %}
   <ul>{% for bench in benchmarks|dictsort:"name" %}
     <li title="{{ bench.description }}">
       <input id="benchmark_{{ bench.id }}" type="radio" name="benchmark" value="{{ bench.name }}" />

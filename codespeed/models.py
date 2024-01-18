@@ -9,18 +9,12 @@ from django.core.exceptions import ValidationError
 from django.urls import reverse
 from django.conf import settings
 from django.db import models
-try:
-    from django.utils.encoding import python_2_unicode_compatible
-except ImportError:
-    def python_2_unicode_compatible(arg):
-        return arg
 
 from .commits.github import GITHUB_URL_RE
 
 logger = logging.getLogger(__name__)
 
 
-@python_2_unicode_compatible
 class Project(models.Model):
     NO_LOGS = 'N'
     GIT = 'G'
@@ -106,7 +100,6 @@ class HistoricalValue(object):
             return False
 
 
-@python_2_unicode_compatible
 class Branch(models.Model):
     name = models.CharField(max_length=32)
     project = models.ForeignKey(
@@ -123,7 +116,6 @@ class Branch(models.Model):
         verbose_name_plural = "branches"
 
 
-@python_2_unicode_compatible
 class Revision(models.Model):
     # git and mercurial's SHA-1 length is 40
     commitid = models.CharField(max_length=42)
@@ -166,7 +158,6 @@ class Revision(models.Model):
                 raise ValidationError("Invalid SVN commit id %s" % self.commitid)
 
 
-@python_2_unicode_compatible
 class Executable(models.Model):
     name = models.CharField(max_length=30)
     description = models.CharField(max_length=200, blank=True)
@@ -180,7 +171,6 @@ class Executable(models.Model):
         return self.name
 
 
-@python_2_unicode_compatible
 class Benchmark(models.Model):
     B_TYPES = (
         ('C', 'Cross-project'),
@@ -215,7 +205,6 @@ class Benchmark(models.Model):
                                   "'default_on_comparison' first.")
 
 
-@python_2_unicode_compatible
 class Environment(models.Model):
     name = models.CharField(unique=True, max_length=100)
     cpu = models.CharField(max_length=100, blank=True)
@@ -227,7 +216,6 @@ class Environment(models.Model):
         return self.name
 
 
-@python_2_unicode_compatible
 class Result(models.Model):
     value = models.FloatField()
     std_dev = models.FloatField(blank=True, null=True)
@@ -252,7 +240,6 @@ class Result(models.Model):
         unique_together = ("revision", "executable", "benchmark", "environment")
 
 
-@python_2_unicode_compatible
 class Report(models.Model):
     revision = models.ForeignKey(
         Revision, on_delete=models.CASCADE, related_name="reports")

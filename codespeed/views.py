@@ -11,7 +11,7 @@ from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.http import HttpResponse, Http404, HttpResponseBadRequest, \
     HttpResponseNotFound, StreamingHttpResponse
 from django.db.models import F
-from django.shortcuts import get_object_or_404, render_to_response
+from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.base import TemplateView
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 def no_environment_error(request):
     admin_url = reverse('admin:codespeed_environment_changelist')
-    return render_to_response('codespeed/nodata.html', {
+    return render(request, 'codespeed/nodata.html', {
         'message': ('You need to configure at least one Environment. '
                     'Please go to the '
                     '<a href="%s">admin interface</a>' % admin_url)
@@ -42,7 +42,7 @@ def no_environment_error(request):
 
 def no_default_project_error(request):
     admin_url = reverse('admin:codespeed_project_changelist')
-    return render_to_response('codespeed/nodata.html', {
+    return render(request, 'codespeed/nodata.html', {
         'message': ('You need to configure at least one one Project as '
                     'default (checked "Track changes" field).<br />'
                     'Please go to the '
@@ -51,13 +51,13 @@ def no_default_project_error(request):
 
 
 def no_executables_error(request):
-    return render_to_response('codespeed/nodata.html', {
+    return render(request, 'codespeed/nodata.html', {
         'message': 'There needs to be at least one executable'
     })
 
 
 def no_data_found(request):
-    return render_to_response('codespeed/nodata.html', {
+    return render(request, 'codespeed/nodata.html', {
         'message': 'No data found'
     })
 
@@ -319,7 +319,7 @@ def comparison(request):
             settings.CHART_ORIENTATION == 'horizontal'):
         selecteddirection = True
 
-    return render_to_response('codespeed/comparison.html', {
+    return render(request, 'codespeed/comparison.html', {
         'checkedexecutables': checkedexecutables,
         'checkedbenchmarks': checkedbenchmarks,
         'checkedenviros': checkedenviros,
@@ -633,7 +633,7 @@ def timeline(request):
     for proj in Project.objects.filter(track=True):
         executables[proj] = Executable.objects.filter(project=proj)
     use_median_bands = hasattr(settings, 'USE_MEDIAN_BANDS') and settings.USE_MEDIAN_BANDS
-    return render_to_response('codespeed/timeline.html', {
+    return render(request, 'codespeed/timeline.html', {
         'pagedesc': pagedesc,
         'checkedexecutables': checkedexecutables,
         'defaultbaseline': defaultbaseline,
@@ -717,7 +717,7 @@ def getchangestable(request):
                             '<p class="errormessage">No results for this '
                             'parameters</p>')
 
-    return render_to_response('codespeed/changes_data.html', {
+    return render(request, 'codespeed/changes_data.html', {
         'tablelist': tablelist,
         'trendconfig': trendconfig,
         'rev': selectedrev,
@@ -823,7 +823,7 @@ def changes(request):
 
     pagedesc = "Report of %s performance changes for commit %s on branch %s" % \
         (defaultexecutable, selectedrevision.commitid, selectedrevision.branch)
-    return render_to_response('codespeed/changes.html', {
+    return render(request, 'codespeed/changes.html', {
         'pagedesc': pagedesc,
         'defaultenvironment': defaultenv,
         'defaultexecutable': defaultexecutable,
@@ -850,7 +850,7 @@ def reports(request):
         colorcode__in=('red', 'green')
     ).order_by('-revision__date')[:10]
 
-    return render_to_response('codespeed/reports.html', context)
+    return render(request, 'codespeed/reports.html', context)
 
 
 @require_GET
@@ -895,7 +895,8 @@ def displaylogs(request):
     for log in logs:
         log['commit_browse_url'] = project.commit_browsing_url.format(**log)
 
-    return render_to_response(
+    return render(
+        request, 
         'codespeed/changes_logs.html',
         {
             'error': error, 'logs': logs,

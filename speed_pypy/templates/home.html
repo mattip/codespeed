@@ -112,7 +112,7 @@
             plotdata[0].push(relative_value);
             plotdata[1].push(1.0);
             labels.push(relative_value.toFixed(2));
-            if (relative_value > 0) {
+            if (relative_value > 0 && !isNaN(relative_value)) {
                 trunk_geomean *= relative_value;
             }
         }
@@ -162,7 +162,10 @@
             num_of_benchs = tagged_data[i].length;
             var tempgeo = 1;
             for (var j in tagged_data[i]) {
-                tempgeo *= tagged_data[i][j];
+				value = tagged_data[i][j];
+				if (value > 0 && !isNaN(value)) {
+					tempgeo *= value;
+				}
             }
             tempgeo = Math.pow(tempgeo, 1/tagged_data[i].length);
             tempgeo = 1/tempgeo;

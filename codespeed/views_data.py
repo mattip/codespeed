@@ -83,10 +83,10 @@ def getbaselineexecutables(include_tags=None):
                 'name': name,
             })
     # move default to first place
-    if hasattr(settings, 'DEF_BASELINE') and settings.DEF_BASELINE is not None:
+    if hasattr(settings, 'DEF_BASELINES') and settings.DEF_BASELINES is not None:
         try:
-            exename = settings.DEF_BASELINE['executable']
-            commitid = settings.DEF_BASELINE['revision']
+            exename = settings.DEF_BASELINES[0]['executable']
+            commitid = settings.DEF_BASELINES[0]['revision']
             for base in baseline:
                 if base['key'] == "none":
                     continue

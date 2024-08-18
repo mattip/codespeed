@@ -69,14 +69,14 @@ class HomeView(TemplateView):
         context = super(HomeView, self).get_context_data(**kwargs)
         context['show_reports'] = settings.SHOW_REPORTS
         context['show_historical'] = settings.SHOW_HISTORICAL
-        historical_settings = ['SHOW_HISTORICAL', 'DEF_BASELINE', 'DEF_EXECUTABLES']
+        historical_settings = ['SHOW_HISTORICAL', 'DEF_BASELINES', 'DEF_EXECUTABLES']
         if not all(getattr(settings, var) for var in historical_settings):
             context['show_historical'] = False
             return context
 
         try:
             baseline_exe = Executable.objects.get(
-                name=settings.DEF_BASELINE['executable'])
+                name=settings.DEF_BASELINES[0]['executable'])
             context['baseline'] = baseline_exe
             def_name = settings.DEF_EXECUTABLES[0]['name']
             def_project = Project.objects.get(name=settings.DEF_EXECUTABLES[0]['project'])
@@ -101,22 +101,23 @@ def gethistoricaldata(request):
         env = env.first()
 
     # Fetch Baseline data, filter by executable
-    baseline_exe = Executable.objects.get(
-        name=settings.DEF_BASELINE['executable'])
-    tag=settings.DEF_BASELINE['revision']
-    rev = Revision.objects.filter(branch__project=baseline_exe.project, tag=tag)
-    if len(rev) < 1:
-        return HttpResponse(json.dumps(
-            f"Could not find {tag=} for {settings.DEF_BASELINE['executable']} in database")
-        )
-    rev0 = rev[0]
-    baseline_results = Result.objects.filter(
-        executable=baseline_exe, revision=rev0, environment=env)
-    if not baseline_results:
-        logger.error('Could not find results for {} rev="{}" env="{}"'.format(
-                baseline_exe, rev0, env))
-    data['baseline'] = '{} {}'.format(
-        settings.DEF_BASELINE['executable'], rev0.tag)
+    baseline_results = []
+    for b in settings.DEF_BASELINES:
+        baseline_exe = Executable.objects.get(
+            name=b['executable'])
+        tag=b['revision']
+        rev = Revision.objects.filter(branch__project=baseline_exe.project, tag=tag)
+        if len(rev) < 1:
+            return HttpResponse(json.dumps(
+                f"Could not find {tag=} for {b['executable']} in database")
+            )
+        rev0 = rev[0]
+        resname = '{} {}'.format(b['executable'], rev0.tag)
+        baseline_results.append((resname, Result.objects.filter(
+            executable=baseline_exe, revision=rev0, environment=env)))
+        if not baseline_results[-1][1]:
+            logger.error('Could not find results for {} rev="{}" env="{}"'.format(
+                    baseline_exe, rev0, env))
 
     default_results = {}
     all_taggedrevs = []
@@ -163,17 +164,30 @@ def gethistoricaldata(request):
 
     # Collect data
     benchmarks = []
-    for res in baseline_results:
+    # Collate first baseline and all the default_results
+    resset = baseline_results[0][1]
+    resname = baseline_results[0][0]
+    data['baseline'] = resname
+    for res in resset:
         if res == 0:
             continue
         benchmarks.append(res.benchmark.name)
-        data['results'][res.benchmark.name] = {data['baseline']: res.value}
+        data['results'][res.benchmark.name] = {resname: res.value}
         for rev_name in default_results:
             val = 0
             for default_res in default_results[rev_name]:
                 if default_res.benchmark.name == res.benchmark.name:
                     val = default_res.value
-            data['results'][res.benchmark.name][rev_name] = val
+                data['results'][res.benchmark.name][rev_name] = val
+    # Collate other baseline
+    for resname, resset in baseline_results[1:]:
+        for res in resset:
+            if res == 0:
+                continue
+            if not res.benchmark.name in data['results']:
+                continue
+            data['results'][res.benchmark.name][resname] = res.value
+        data['tagged_revs'].insert(0, resname)
     benchmarks.sort()
     data['benchmarks'] = benchmarks
     return HttpResponse(json.dumps(data))

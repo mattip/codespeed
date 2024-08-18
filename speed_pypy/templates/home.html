@@ -33,7 +33,7 @@
     <p class="plot-caption">Plot 1: The above plot represents {{ default_exe.project }} ({{ default_exe }}) benchmark times normalized to {{ baseline }}. Smaller is better.</p>
     <p>It depends greatly on the type of task being performed. The geometric average of all benchmarks is <span id="geomean"></span> or <strong id="geofaster"></strong> times <em>faster</em> than {{ baseline }}</p>
 
-    <h3>How has {{ default_exe.project }} performance evolved over time?</h3>
+    <h3>How has PyPy performance evolved over time?</h3>
     <div id="historical-plot"></div>
     <p class="plot-caption">Plot 2: Speedup compared to {{ baseline }}, using the inverse of the geometric average of normalized times, out of <span id="num_of_benchs"></span> benchmarks (see <a href="http://dl.acm.org/citation.cfm?id=5673" title="How not to lie with statistics: the correct way to summarize benchmark results">paper</a> on why the geometric mean is better for normalized results).</p>
   </div>
@@ -79,6 +79,10 @@
         var benchmarks = new Array();
         if (data === null || data.length === 0) {
             $("#baseline-comparison-plot").html(getLoadText('Error retrieving data', 0));
+            return 1;
+        }
+        if (typeof data === 'string' || data instanceof String) {
+            $("#baseline-comparison-plot").html(getLoadText('Error retrieving data ' + data, 0));
             return 1;
         }
         var trunk_geomean = 1;
@@ -169,7 +173,7 @@
         for (var i in data['tagged_revs']) {
             ticks.push(data['tagged_revs'][i]);
         }
-        ticks.push('latest');
+        ticks.push('latest {{ default_exe.project }}');
         var geolabels = new Array();
         for (var i in geomeans) {
             geolabels.push(geomeans[i].toFixed(2) + "x");
@@ -197,7 +201,7 @@
                 },
                 yaxis:{
                     min: 0,
-                    tickOptions:{formatString:'%.2f'}
+                    tickOptions:{formatString:'%.1f'}
                 }
             }
         };

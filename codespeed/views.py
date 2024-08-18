@@ -69,7 +69,7 @@ class HomeView(TemplateView):
         context = super(HomeView, self).get_context_data(**kwargs)
         context['show_reports'] = settings.SHOW_REPORTS
         context['show_historical'] = settings.SHOW_HISTORICAL
-        historical_settings = ['SHOW_HISTORICAL', 'DEF_BASELINE', 'DEF_EXECUTABLE']
+        historical_settings = ['SHOW_HISTORICAL', 'DEF_BASELINE', 'DEF_EXECUTABLES']
         if not all(getattr(settings, var) for var in historical_settings):
             context['show_historical'] = False
             return context
@@ -78,8 +78,8 @@ class HomeView(TemplateView):
             baseline_exe = Executable.objects.get(
                 name=settings.DEF_BASELINE['executable'])
             context['baseline'] = baseline_exe
-            def_name = settings.DEF_EXECUTABLE['name']
-            def_project = Project.objects.get(name=settings.DEF_EXECUTABLE['project'])
+            def_name = settings.DEF_EXECUTABLES[0]['name']
+            def_project = Project.objects.get(name=settings.DEF_EXECUTABLES[0]['project'])
             default_exe = Executable.objects.get(name=def_name,
                                                  project=def_project,
                                                 )
@@ -103,42 +103,52 @@ def gethistoricaldata(request):
     # Fetch Baseline data, filter by executable
     baseline_exe = Executable.objects.get(
         name=settings.DEF_BASELINE['executable'])
-    baseline_revs = Revision.objects.filter(
-        branch__project=baseline_exe.project).order_by('-date')
-    baseline_lastrev = baseline_revs[0]
-    for rev in baseline_revs:
-        baseline_results = Result.objects.filter(
-            executable=baseline_exe, revision=rev, environment=env)
-        if baseline_results:
-            baseline_lastrev = rev
-            break
-    if len(baseline_results) == 0:
+    tag=settings.DEF_BASELINE['revision']
+    rev = Revision.objects.filter(branch__project=baseline_exe.project, tag=tag)
+    if len(rev) < 1:
+        return HttpResponse(json.dumps(
+            f"Could not find {tag=} for {settings.DEF_BASELINE['executable']} in database")
+        )
+    rev0 = rev[0]
+    baseline_results = Result.objects.filter(
+        executable=baseline_exe, revision=rev0, environment=env)
+    if not baseline_results:
         logger.error('Could not find results for {} rev="{}" env="{}"'.format(
-                baseline_exe, baseline_lastrev, env))
+                baseline_exe, rev0, env))
     data['baseline'] = '{} {}'.format(
-        settings.DEF_BASELINE['executable'], baseline_lastrev.tag)
+        settings.DEF_BASELINE['executable'], rev0.tag)
 
-    def_name = settings.DEF_EXECUTABLE['name']
-    def_project = Project.objects.get(name=settings.DEF_EXECUTABLE['project'])
+    default_results = {}
+    all_taggedrevs = []
+    for executable in settings.DEF_EXECUTABLES:
+        _def_name = executable['name']
+        _def_project = Project.objects.get(name=executable['project'])
+        _default_exe = Executable.objects.get(name=_def_name, project=_def_project)
+        _default_branch = Branch.objects.get(
+            name=_default_exe.project.default_branch,
+            project=_default_exe.project)
+
+        # Fetch tagged revisions for executable
+        default_taggedrevs = Revision.objects.filter(
+                branch=_default_branch
+            ).exclude(tag="").order_by('date')
+        all_taggedrevs += default_taggedrevs
+        for rev in default_taggedrevs:
+            res = Result.objects.filter(
+                executable=_default_exe, revision=rev, environment=env)
+            if not res:
+                logger.info("no results for '%s' '%s' '%s'" % (str(_default_exe), str(rev), str(env)))
+                continue
+            default_results[rev.tag] = res
+    data['tagged_revs'] = [rev.tag for rev in all_taggedrevs if rev.tag in default_results]
+    # Fetch data for latest results
+    executable = settings.DEF_EXECUTABLES[0]
+    def_name = executable['name']
+    def_project = Project.objects.get(name=executable['project'])
     default_exe = Executable.objects.get(name=def_name, project=def_project)
     default_branch = Branch.objects.get(
-        name=default_exe.project.default_branch,
-        project=default_exe.project)
-
-    # Fetch tagged revisions for executable
-    default_taggedrevs = Revision.objects.filter(
-            branch=default_branch
-        ).exclude(tag="").order_by('date')
-    default_results = {}
-    for rev in default_taggedrevs:
-        res = Result.objects.filter(
-            executable=default_exe, revision=rev, environment=env)
-        if not res:
-            logger.info('no results for %s %s %s' % (str(default_exe), str(rev), str(env)))
-            continue
-        default_results[rev.tag] = res
-    data['tagged_revs'] = [rev.tag for rev in default_taggedrevs if rev.tag in default_results]
-    # Fetch data for latest results
+            name=default_exe.project.default_branch,
+            project=default_exe.project)
     revs = Revision.objects.filter(
         branch=default_branch).order_by('-date')[:100]
     default_lastrev = None
@@ -896,7 +906,7 @@ def displaylogs(request):
         log['commit_browse_url'] = project.commit_browsing_url.format(**log)
 
     return render(
-        request, 
+        request,
         'codespeed/changes_logs.html',
         {
             'error': error, 'logs': logs,

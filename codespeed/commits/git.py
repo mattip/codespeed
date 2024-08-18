@@ -64,8 +64,8 @@ def getlogs(endrev, startrev):
     p, stdout, stderr = execute_command(cmd, working_copy)
 
     if p.returncode != 0:
-        raise CommitLogError("%s returned %s: %s" % (
-                             " ".join(cmd), p.returncode, stderr))
+        raise CommitLogError(f"'%s' in '%s' returned %s: %s" % (
+                             " ".join(cmd), working_copy, p.returncode, stderr))
     logs = []
     for log in filter(None, stdout.split('\x1e')):
         (short_commit_id, commit_id, date_t, author_name, author_email,

@@ -73,7 +73,7 @@ def save_result(data, update_repo=True):
         b.save()
 
     try:
-        rev = branch.revisions.get(commitid=data['commitid'])
+        rev = branch.revisions.get(commitid=data['commitid'].split(":")[-1])
     except Revision.DoesNotExist:
         rev_date = data.get("revision_date")
         # "None" (as string) can happen when we urlencode the POST data

@@ -83,10 +83,10 @@ def getbaselineexecutables(include_tags=None):
                 'name': name,
             })
     # move default to first place
-    if hasattr(settings, 'DEF_BASELINE') and settings.DEF_BASELINE is not None:
+    if hasattr(settings, 'DEF_BASELINES') and settings.DEF_BASELINES is not None:
         try:
-            exename = settings.DEF_BASELINE['executable']
-            commitid = settings.DEF_BASELINE['revision']
+            exename = settings.DEF_BASELINES[0]['executable']
+            commitid = settings.DEF_BASELINES[0]['revision']
             for base in baseline:
                 if base['key'] == "none":
                     continue
@@ -104,11 +104,11 @@ def getbaselineexecutables(include_tags=None):
 
 def getdefaultexecutable():
     default = None
-    if (hasattr(settings, 'DEF_EXECUTABLE') and
-            settings.DEF_EXECUTABLE is not None):
+    if (hasattr(settings, 'DEF_EXECUTABLES') and
+            settings.DEF_EXECUTABLES is not None):
         try:
-            def_name = settings.DEF_EXECUTABLE['name']
-            def_project = Project.objects.get(name=settings.DEF_EXECUTABLE['project'])
+            def_name = settings.DEF_EXECUTABLES[0]['name']
+            def_project = Project.objects.get(name=settings.DEF_EXECUTABLES[0]['project'])
             default = Executable.objects.get(name=def_name, project=def_project)
         except Executable.DoesNotExist:
             pass

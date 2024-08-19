@@ -33,7 +33,7 @@
     <p class="plot-caption">Plot 1: The above plot represents {{ default_exe.project }} ({{ default_exe }}) benchmark times normalized to {{ baseline }}. Smaller is better.</p>
     <p>It depends greatly on the type of task being performed. The geometric average of all benchmarks is <span id="geomean"></span> or <strong id="geofaster"></strong> times <em>faster</em> than {{ baseline }}</p>
 
-    <h3>How has {{ default_exe.project }} performance evolved over time?</h3>
+    <h3>How has PyPy performance evolved over time?</h3>
     <div id="historical-plot"></div>
     <p class="plot-caption">Plot 2: Speedup compared to {{ baseline }}, using the inverse of the geometric average of normalized times, out of <span id="num_of_benchs"></span> benchmarks (see <a href="http://dl.acm.org/citation.cfm?id=5673" title="How not to lie with statistics: the correct way to summarize benchmark results">paper</a> on why the geometric mean is better for normalized results).</p>
   </div>
@@ -81,6 +81,10 @@
             $("#baseline-comparison-plot").html(getLoadText('Error retrieving data', 0));
             return 1;
         }
+        if (typeof data === 'string' || data instanceof String) {
+            $("#baseline-comparison-plot").html(getLoadText('Error retrieving data ' + data, 0));
+            return 1;
+        }
         var trunk_geomean = 1;
         var tagged_data = new Array();
         for (i in data['tagged_revs']) {
@@ -108,7 +112,7 @@
             plotdata[0].push(relative_value);
             plotdata[1].push(1.0);
             labels.push(relative_value.toFixed(2));
-            if (relative_value > 0) {
+            if (relative_value > 0 && !isNaN(relative_value)) {
                 trunk_geomean *= relative_value;
             }
         }
@@ -158,7 +162,10 @@
             num_of_benchs = tagged_data[i].length;
             var tempgeo = 1;
             for (var j in tagged_data[i]) {
-                tempgeo *= tagged_data[i][j];
+				value = tagged_data[i][j];
+				if (value > 0 && !isNaN(value)) {
+					tempgeo *= value;
+				}
             }
             tempgeo = Math.pow(tempgeo, 1/tagged_data[i].length);
             tempgeo = 1/tempgeo;
@@ -169,7 +176,7 @@
         for (var i in data['tagged_revs']) {
             ticks.push(data['tagged_revs'][i]);
         }
-        ticks.push('latest');
+        ticks.push('latest {{ default_exe.project }}');
         var geolabels = new Array();
         for (var i in geomeans) {
             geolabels.push(geomeans[i].toFixed(2) + "x");
@@ -197,7 +204,7 @@
                 },
                 yaxis:{
                     min: 0,
-                    tickOptions:{formatString:'%.2f'}
+                    tickOptions:{formatString:'%.1f'}
                 }
             }
         };

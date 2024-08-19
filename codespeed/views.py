@@ -69,17 +69,17 @@ class HomeView(TemplateView):
         context = super(HomeView, self).get_context_data(**kwargs)
         context['show_reports'] = settings.SHOW_REPORTS
         context['show_historical'] = settings.SHOW_HISTORICAL
-        historical_settings = ['SHOW_HISTORICAL', 'DEF_BASELINE', 'DEF_EXECUTABLE']
+        historical_settings = ['SHOW_HISTORICAL', 'DEF_BASELINES', 'DEF_EXECUTABLES']
         if not all(getattr(settings, var) for var in historical_settings):
             context['show_historical'] = False
             return context
 
         try:
             baseline_exe = Executable.objects.get(
-                name=settings.DEF_BASELINE['executable'])
+                name=settings.DEF_BASELINES[0]['executable'])
             context['baseline'] = baseline_exe
-            def_name = settings.DEF_EXECUTABLE['name']
-            def_project = Project.objects.get(name=settings.DEF_EXECUTABLE['project'])
+            def_name = settings.DEF_EXECUTABLES[0]['name']
+            def_project = Project.objects.get(name=settings.DEF_EXECUTABLES[0]['project'])
             default_exe = Executable.objects.get(name=def_name,
                                                  project=def_project,
                                                 )
@@ -101,44 +101,55 @@ def gethistoricaldata(request):
         env = env.first()
 
     # Fetch Baseline data, filter by executable
-    baseline_exe = Executable.objects.get(
-        name=settings.DEF_BASELINE['executable'])
-    baseline_revs = Revision.objects.filter(
-        branch__project=baseline_exe.project).order_by('-date')
-    baseline_lastrev = baseline_revs[0]
-    for rev in baseline_revs:
-        baseline_results = Result.objects.filter(
-            executable=baseline_exe, revision=rev, environment=env)
-        if baseline_results:
-            baseline_lastrev = rev
-            break
-    if len(baseline_results) == 0:
-        logger.error('Could not find results for {} rev="{}" env="{}"'.format(
-                baseline_exe, baseline_lastrev, env))
-    data['baseline'] = '{} {}'.format(
-        settings.DEF_BASELINE['executable'], baseline_lastrev.tag)
+    baseline_results = []
+    for b in settings.DEF_BASELINES:
+        baseline_exe = Executable.objects.get(
+            name=b['executable'])
+        tag=b['revision']
+        rev = Revision.objects.filter(branch__project=baseline_exe.project, tag=tag)
+        if len(rev) < 1:
+            return HttpResponse(json.dumps(
+                f"Could not find {tag=} for {b['executable']} in database")
+            )
+        rev0 = rev[0]
+        resname = '{} {}'.format(b['executable'], rev0.tag)
+        baseline_results.append((resname, Result.objects.filter(
+            executable=baseline_exe, revision=rev0, environment=env)))
+        if not baseline_results[-1][1]:
+            logger.error('Could not find results for {} rev="{}" env="{}"'.format(
+                    baseline_exe, rev0, env))
 
-    def_name = settings.DEF_EXECUTABLE['name']
-    def_project = Project.objects.get(name=settings.DEF_EXECUTABLE['project'])
+    default_results = {}
+    all_taggedrevs = []
+    for executable in settings.DEF_EXECUTABLES:
+        _def_name = executable['name']
+        _def_project = Project.objects.get(name=executable['project'])
+        _default_exe = Executable.objects.get(name=_def_name, project=_def_project)
+        _default_branch = Branch.objects.get(
+            name=_default_exe.project.default_branch,
+            project=_default_exe.project)
+
+        # Fetch tagged revisions for executable
+        default_taggedrevs = Revision.objects.filter(
+                branch=_default_branch
+            ).exclude(tag="").order_by('date')
+        all_taggedrevs += default_taggedrevs
+        for rev in default_taggedrevs:
+            res = Result.objects.filter(
+                executable=_default_exe, revision=rev, environment=env)
+            if not res:
+                logger.info("no results for '%s' '%s' '%s'" % (str(_default_exe), str(rev), str(env)))
+                continue
+            default_results[rev.tag] = res
+    data['tagged_revs'] = [rev.tag for rev in all_taggedrevs if rev.tag in default_results]
+    # Fetch data for latest results
+    executable = settings.DEF_EXECUTABLES[0]
+    def_name = executable['name']
+    def_project = Project.objects.get(name=executable['project'])
     default_exe = Executable.objects.get(name=def_name, project=def_project)
     default_branch = Branch.objects.get(
-        name=default_exe.project.default_branch,
-        project=default_exe.project)
-
-    # Fetch tagged revisions for executable
-    default_taggedrevs = Revision.objects.filter(
-            branch=default_branch
-        ).exclude(tag="").order_by('date')
-    default_results = {}
-    for rev in default_taggedrevs:
-        res = Result.objects.filter(
-            executable=default_exe, revision=rev, environment=env)
-        if not res:
-            logger.info('no results for %s %s %s' % (str(default_exe), str(rev), str(env)))
-            continue
-        default_results[rev.tag] = res
-    data['tagged_revs'] = [rev.tag for rev in default_taggedrevs if rev.tag in default_results]
-    # Fetch data for latest results
+            name=default_exe.project.default_branch,
+            project=default_exe.project)
     revs = Revision.objects.filter(
         branch=default_branch).order_by('-date')[:100]
     default_lastrev = None
@@ -153,17 +164,30 @@ def gethistoricaldata(request):
 
     # Collect data
     benchmarks = []
-    for res in baseline_results:
+    # Collate first baseline and all the default_results
+    resset = baseline_results[0][1]
+    resname = baseline_results[0][0]
+    data['baseline'] = resname
+    for res in resset:
         if res == 0:
             continue
         benchmarks.append(res.benchmark.name)
-        data['results'][res.benchmark.name] = {data['baseline']: res.value}
+        data['results'][res.benchmark.name] = {resname: res.value}
         for rev_name in default_results:
             val = 0
             for default_res in default_results[rev_name]:
                 if default_res.benchmark.name == res.benchmark.name:
                     val = default_res.value
-            data['results'][res.benchmark.name][rev_name] = val
+                data['results'][res.benchmark.name][rev_name] = val
+    # Collate other baseline
+    for resname, resset in baseline_results[1:]:
+        for res in resset:
+            if res == 0:
+                continue
+            if not res.benchmark.name in data['results']:
+                continue
+            data['results'][res.benchmark.name][resname] = res.value
+        data['tagged_revs'].insert(0, resname)
     benchmarks.sort()
     data['benchmarks'] = benchmarks
     return HttpResponse(json.dumps(data))
@@ -896,7 +920,7 @@ def displaylogs(request):
         log['commit_browse_url'] = project.commit_browsing_url.format(**log)
 
     return render(
-        request, 
+        request,
         'codespeed/changes_logs.html',
         {
             'error': error, 'logs': logs,

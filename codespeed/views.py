@@ -121,7 +121,7 @@ def gethistoricaldata(request):
 
     default_results = {}
     all_taggedrevs = []
-    for executable in settings.DEF_EXECUTABLES:
+    for executable in settings.DEF_EXECUTABLES[::-1]:
         _def_name = executable['name']
         _def_project = Project.objects.get(name=executable['project'])
         _default_exe = Executable.objects.get(name=_def_name, project=_def_project)

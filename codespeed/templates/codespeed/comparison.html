@@ -32,19 +32,15 @@
   <div class="boxbody">
     {% for proj, executable in executables.items %}
     <ul><a href="#" class="togglefold">{{ proj }}</a> <a href="#" class="checkall">(All</a>, <a href="#" class="uncheckall">None)</a>
-    {% if forloop.counter > 3 %}
     {% for exe in executable %}
       <li title="{{ exe.executable }} - {{ exe.revision }}">
-        <input id="exe_{{ exe.key }}" type="checkbox" name="executables" value="{{ exe.key }}" />
+        {% if exe.key in checkedexecutables %}
+            <input id="exe_{{ exe.key }}" type="checkbox" name="executables" value="{{ exe.key }}" checked />
+        {% else %}
+            <input id="exe_{{ exe.key }}" type="checkbox" name="executables" value="{{ exe.key }}" />
+        {% endif %}
         <label for="exe_{{ exe.key }}">{{ exe.name }}</label><div class="seriescolor"></div>
       </li>{% endfor %}
-    {% else %}
-    {% for exe in executable %}
-      <li title="{{ exe.executable }} - {{ exe.revision }}">
-        <input id="exe_{{ exe.key }}" type="checkbox" name="executables" value="{{ exe.key }}" checked />
-        <label for="exe_{{ exe.key }}">{{ exe.name }}</label><div class="seriescolor"></div>
-      </li>{% endfor %}
-    {% endif %}
     </ul>{% endfor %}
   </div>
 </div>

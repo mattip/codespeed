@@ -234,6 +234,7 @@ div.about_content { text-align: left; }
 .boxbody input { margin-left: 0; vertical-align: top; }
 #options li { margin-bottom: 0.8em; }
 .seriescolor { float: right; margin-top: 2px; height: 13px; width: 14px; }
+.compplot-wrap { display: inline-block; }
 a.togglefold { font-size: normal; color: #000000; }
 a.togglefold::before {
   content: '▶';

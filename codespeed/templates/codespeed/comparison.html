@@ -51,7 +51,11 @@
   <ul><a href="#" class="togglefold">{{ key }}</a> <a href="#" class="checkall">(All</a>, <a href="#" class="uncheckall">None)</a>
     {% for bench in benchlist|dictsort:"name" %}
     <li title="{{ bench.description }}">
-      <input id="benchmark_{{ bench.id }}" type="checkbox" name="benchmarks" value="{{ bench.id }}" />
+      {% if bench in checkedbenchmarks %}
+        <input id="benchmark_{{ bench.id }}" type="checkbox" name="benchmarks" value="{{ bench.id }}" checked />
+      {% else %}
+        <input id="benchmark_{{ bench.id }}" type="checkbox" name="benchmarks" value="{{ bench.id }}" />
+      {% endif %}
       <label for="benchmark_{{ bench.id }}">{{ bench }}</label>
     </li>{% endfor %}
   </ul>{% endfor %}

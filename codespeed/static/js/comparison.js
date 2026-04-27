@@ -409,11 +409,6 @@ function init(defaults) {
     });
     */
 
-    sel = $("input[name='benchmarks']");
-    $.each(defaults.benchmarks, function(i, bench) {
-        sel.filter("[value='" + bench + "']").prop('checked', true);
-    });
-
     sel = $("input[name='environments']");
     $.each(defaults.environments, function(i, env) {
         sel.filter("[value='" + env + "']").prop('checked', true);

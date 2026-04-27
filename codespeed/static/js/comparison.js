@@ -5,6 +5,10 @@ var readCheckbox = window.readCheckbox, getLoadText = window.getLoadText;
 
 var compdata, bench_units, dataCache = {}, chartInstances = [];
 
+Chart.Tooltip.positioners.cursor = function(_items, eventPosition) {
+    return {x: eventPosition.x, y: eventPosition.y};
+};
+
 var COLORS = [
     '#4e79a7', '#f28e2b', '#e15759', '#76b7b2',
     '#59a14f', '#edc948', '#b07aa1', '#ff9da7',
@@ -235,6 +239,7 @@ function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline,
             maintainAspectRatio: false,
             plugins: {
                 title: {display: true, text: title, font: {size: 15}},
+                tooltip: {position: 'cursor'},
                 legend: {
                     position: 'right',
                     align: 'start',

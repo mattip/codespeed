@@ -64,12 +64,20 @@ function refreshContent() {
 function savedata(data) {
   if (data.error !== "None") {
     var h = $("#content").height();//get height for error message
-    $("#cplot").html(getLoadText(data.error, h));
+    $("#plotwrapper").html(getLoadText(data.error, h));
     return 1;
   }
   delete data.error;
   compdata = data;
   refreshContent();
+}
+
+function loadData() {
+  var conf = getConfiguration();
+  if (!conf.exe || !conf.ben) { return; }
+  var h = $("#content").height();
+  $("#plotwrapper").html(getLoadText("Loading...", h));
+  $.getJSON("json/", {exe: conf.exe, ben: conf.ben}, savedata);
 }
 
 function abortRender(plotid, message) {
@@ -411,19 +419,18 @@ function init(defaults) {
         sel.filter("[value='" + env + "']").prop('checked', true);
     });
 
-    $("#chart_type, #baseline, #direction, input[name='executables']," +
-      "input[name='benchmarks'], input[name='environments']").change(refreshContent);
+    // Re-fetch when exe or benchmark selection changes
+    $("input[name='executables'], input[name='benchmarks']").change(loadData);
+    $('.checkall, .uncheckall').click(loadData);
 
-    $('.checkall, .uncheckall').click(refreshContent);
+    // Re-render without re-fetching for other controls
+    $("#chart_type, #baseline, #direction, input[name='environments']").change(refreshContent);
 
     $.ajaxSetup ({
       cache: false
     });
 
-    // Get comparison data
-    var h = $("#content").height();//get height for loading text
-    $("#cplot").html(getLoadText("Loading...", h));
-    $.getJSON("json/", savedata);
+    loadData();
 
     $("#permalink").click(function() {
         window.location = "?" + $.param(getConfiguration());

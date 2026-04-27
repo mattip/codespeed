@@ -474,9 +474,7 @@ div.miniplot {
     border-radius: 10px;
 }
 div.miniplot:hover { background-color: #F1F1F1; }
-.jqplot-highlighter-tooltip {
-    -moz-border-radius: 10px; -webkit-border-radius: 10px; border-radius: 10px;
-}
+
 #dygraph-tooltip {
     display: none;
     position: absolute;

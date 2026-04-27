@@ -380,6 +380,19 @@ def comparison(request):
         except:
             pass  # Keep "none" as default baseline
 
+    if selectedbaseline == "none" and 'bas' not in data:
+        if hasattr(settings, 'DEF_EXECUTABLES') and settings.DEF_EXECUTABLES:
+            try:
+                exe_spec = settings.DEF_EXECUTABLES[0]
+                proj = Project.objects.get(name=exe_spec['project'])
+                exe = Executable.objects.get(name=exe_spec['name'], project=proj)
+                for key in exekeys:
+                    if key.startswith(str(exe.id) + "+L+") and key in checkedexecutables:
+                        selectedbaseline = key
+                        break
+            except (Executable.DoesNotExist, Project.DoesNotExist):
+                pass
+
     selecteddirection = False
     if ('hor' in data and data['hor'] == "true" or
         hasattr(settings, 'CHART_ORIENTATION') and

@@ -72,6 +72,22 @@ function savedata(data) {
   refreshContent();
 }
 
+function updateBaselineDropdown() {
+  var $baseline = $("#baseline");
+  var current = $baseline.val();
+  $baseline.find("option:not([value='none'])").remove();
+  $("input[name='executables']:checked").each(function() {
+    var key = $(this).val();
+    var name = $(this).next('label').text().trim();
+    $baseline.append($('<option>').val(key).text(name));
+  });
+  if ($baseline.find("option[value='" + current + "']").length) {
+    $baseline.val(current);
+  } else {
+    $baseline.val('none');
+  }
+}
+
 function loadData() {
   var conf = getConfiguration();
   if (!conf.exe || !conf.ben) { return; }
@@ -399,7 +415,6 @@ function init(defaults) {
 
     // Set default values
     $("#chart_type").val(defaults.chart_type);
-    $("#baseline").val(defaults.baseline);
     $("#direction").prop('checked', defaults.direction === "True");
 
     /*
@@ -414,9 +429,23 @@ function init(defaults) {
         sel.filter("[value='" + env + "']").prop('checked', true);
     });
 
-    // Re-fetch when exe or benchmark selection changes
-    $("input[name='executables'], input[name='benchmarks']").change(loadData);
-    $('.checkall, .uncheckall').click(loadData);
+    // Populate baseline dropdown from initially-checked executables
+    updateBaselineDropdown();
+    $("#baseline").val(defaults.baseline);
+
+    // Exe changes: rebuild baseline dropdown + re-fetch
+    $("input[name='executables']").change(function() {
+        updateBaselineDropdown();
+        loadData();
+    });
+    $("#executable .checkall, #executable .uncheckall").click(function() {
+        updateBaselineDropdown();
+        loadData();
+    });
+
+    // Benchmark changes: re-fetch only
+    $("input[name='benchmarks']").change(loadData);
+    $("#benchmark .checkall, #benchmark .uncheckall").click(loadData);
 
     // Re-render without re-fetching for other controls
     $("#chart_type, #baseline, #direction, input[name='environments']").change(refreshContent);

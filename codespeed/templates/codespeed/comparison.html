@@ -71,10 +71,7 @@
   </span>
   <span class="options" title="Select baseline for normalization">Normalization:
     <select id="baseline">
-      <option value="none">None</option>{% for proj, exes in executables.items %}
-      {% for exe in exes %}
-      <option value="{{ exe.key }}">{{ exe.name }}</option>{% endfor %}
-      {% endfor %}
+      <option value="none">None</option>
     </select>
   </span>
   <span class="options">

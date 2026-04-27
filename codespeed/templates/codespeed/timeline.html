@@ -103,6 +103,7 @@
 <div id="plotgrid"></div>
 <div id="plotdescription"></div>
 </div>
+<div id="dygraph-tooltip"></div>
 {% endblock %}
 
 {% block extra_script %}
@@ -120,7 +121,7 @@
       executables: [{% for exe in checkedexecutables %}{{ exe.id }}, {% endfor %}],
       branches: [{% for b in branch_list %}"{{ branch }}", {% endfor %}],
       benchmark: "{{ defaultbenchmark }}",
-      environment: "{{ defaultenvironment.id }}",
+      environment: "{{ defaultenvironment.0.id }}",
       equidistant: "{{ defaultequid }}",
       quartiles: "{{ defaultquarts }}",
       extrema: "{{ defaultextr }}"

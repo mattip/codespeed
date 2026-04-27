@@ -100,6 +100,7 @@ DEF_EXECUTABLES = [
                   ]
 DEF_ENVIRONMENT = 'benchmarker'
 CHART_ORIENTATION = 'horizontal'
+DEF_BENCHMARK = 'grid'
 
 
 from .local_settings import *

@@ -60,6 +60,7 @@ function updateUrl() {
 
 function destroyPlots() {
     if (plotInstance) { plotInstance.destroy(); plotInstance = null; }
+    $("#plot").off("mousemove.tooltip");
     miniplotInstances.forEach(function(g) { g.destroy(); });
     miniplotInstances = [];
 }
@@ -107,7 +108,8 @@ function buildGraphData(branches, median, equidistant) {
 
                 dateIndex[dateKey] = new Date(dateKey.trim());
                 seriesRaw[exe_id][dateKey] = {low: low, mid: mid, high: high,
-                                              commit: commit, tag: tag};
+                                              commit: commit, tag: tag,
+                                              dateKey: dateKey};
             }
         }
     }
@@ -126,12 +128,15 @@ function buildGraphData(branches, median, equidistant) {
 
     // commitMap[dateKey][exe_id] = {commit, tag}
     var commitMap = {};
+    var tsMap = {}; // timestamp (ms) -> dateKey, for legend lookup
     sortedDateKeys.forEach(function(dk) {
+        tsMap[dateIndex[dk].getTime()] = dk;
         commitMap[dk] = {};
         seriesIds.forEach(function(id) {
             if (seriesRaw[id][dk]) {
-                commitMap[dk][id] = {commit: seriesRaw[id][dk].commit,
-                                     tag:    seriesRaw[id][dk].tag};
+                var pt = seriesRaw[id][dk];
+                commitMap[dk][id] = {commit: pt.commit, tag: pt.tag,
+                                     low: pt.low, high: pt.high};
             }
         });
     });
@@ -148,7 +153,7 @@ function buildGraphData(branches, median, equidistant) {
 
     return {labels: labels, colors: colors, data: graphData,
             commitMap: commitMap, sortedDateKeys: sortedDateKeys,
-            seriesIds: seriesIds};
+            seriesIds: seriesIds, tsMap: tsMap};
 }
 
 function renderPlot(data) {
@@ -186,7 +191,57 @@ function renderPlot(data) {
     var commitMap = built.commitMap;
     var sortedDateKeys = built.sortedDateKeys;
     var seriesIds = built.seriesIds;
+    var tsMap = built.tsMap;
     var env = $("input[name='environments']:checked").val();
+
+    // Map label -> color and label -> exeId for tooltip
+    var colorMap = {};
+    var labelToExeId = {};
+    built.labels.slice(1).forEach(function(lbl, i) {
+        colorMap[lbl] = built.colors[i];
+        labelToExeId[lbl] = seriesIds[i];
+    });
+
+    function lookupDateKey(x) {
+        if (equidistant) { return sortedDateKeys[Math.round(x)]; }
+        var dk = tsMap[x];
+        if (!dk) {
+            // find closest
+            dk = sortedDateKeys.reduce(function(best, curr) {
+                return Math.abs(new Date(curr.trim()) - x) <
+                       Math.abs(new Date(best.trim()) - x) ? curr : best;
+            }, sortedDateKeys[0]);
+        }
+        return dk;
+    }
+
+    function legendFormatter(ld) {
+        if (ld.x === undefined) { return ''; }
+        var dk = lookupDateKey(ld.x);
+        var html = '<div style="font-weight:bold;margin-bottom:3px">' +
+                   (dk ? dk.slice(0, 16) : '') + '</div>';
+        ld.series.forEach(function(s) {
+            if (!s.isVisible || s.y === undefined) { return; }
+            var exeId = labelToExeId[s.labelHTML] || labelToExeId[s.name];
+            var color = colorMap[s.labelHTML] || colorMap[s.name] || '#333';
+            html += '<div style="margin:2px 0;color:' + color + '">' +
+                    '<b>' + s.labelHTML + ': ' + s.y.toPrecision(4) + '</b>';
+            if (dk && commitMap[dk] && commitMap[dk][exeId]) {
+                var info = commitMap[dk][exeId];
+                if (info.low !== info.high) {
+                    html += ' <span style="font-weight:normal">[' +
+                            info.low.toPrecision(3) + ' \u2013 ' +
+                            info.high.toPrecision(3) + ']</span>';
+                }
+                html += '<br><span style="font-size:0.85em;font-weight:normal;color:#666">' +
+                        'commit: ' + info.commit;
+                if (info.tag) { html += '&nbsp;&nbsp;tag: ' + info.tag; }
+                html += '</span>';
+            }
+            html += '</div>';
+        });
+        return html;
+    }
 
     // Per-series options: baseline gets thinner line, no points
     var seriesOpts = {};
@@ -211,6 +266,8 @@ function renderPlot(data) {
         }
     } : {};
 
+    var lastHighlightPoints = null, lastHighlightX = null;
+
     plotInstance = new Dygraph(
         document.getElementById('plot'),
         built.data,
@@ -221,7 +278,7 @@ function renderPlot(data) {
             colors: built.colors,
             customBars: true,
             series: seriesOpts,
-            legend: 'always',
+            legend: 'never',
             ylabel: data.units + data.lessisbetter,
             axes: {
                 x: xAxisOpts,
@@ -229,6 +286,15 @@ function renderPlot(data) {
             },
             connectSeparatedPoints: true,
             highlightSeriesOpts: { strokeWidth: 3 },
+            highlightCircleSize: 5,
+            highlightCallback: function(e, x, points) {
+                lastHighlightX = x;
+                lastHighlightPoints = points;
+            },
+            unhighlightCallback: function() {
+                lastHighlightPoints = null;
+                $("#dygraph-tooltip").hide();
+            },
             // Navigate to changes page on point click
             clickCallback: function(e, x, points) {
                 var dk;
@@ -250,6 +316,38 @@ function renderPlot(data) {
             }
         }
     );
+
+    $("#plot").on("mousemove.tooltip", function(e) {
+        var $tip = $("#dygraph-tooltip");
+        if (!lastHighlightPoints) { $tip.hide(); return; }
+        var THRESHOLD = 0.015;
+        var area = plotInstance.getArea();
+        var mx = e.offsetX !== undefined ? e.offsetX : e.layerX;
+        var my = e.offsetY !== undefined ? e.offsetY : e.layerY;
+        var close = lastHighlightPoints.some(function(pt) {
+            if (pt.canvasx === undefined) { return false; }
+            var dx = (mx - pt.canvasx) / area.w;
+            var dy = (my - pt.canvasy) / area.w;
+            return Math.sqrt(dx*dx + dy*dy) < THRESHOLD;
+        });
+        if (close) {
+            var chartOffset = $("#plot").offset();
+            var absX = chartOffset.left + mx;
+            var onRight = absX > $(window).width() / 2;
+            $tip.html(legendFormatter({x: lastHighlightX, series: lastHighlightPoints.map(function(pt) {
+                return {color: colorMap[pt.name] || '#333',
+                        labelHTML: pt.name, name: pt.name,
+                        y: pt.yval, isVisible: true};
+            })}));
+            var tipW = $tip.outerWidth();
+            $tip.css({
+                left: onRight ? (absX - tipW - 18) + 'px' : (absX + 18) + 'px',
+                top:  (chartOffset.top + my - 10) + 'px'
+            }).show();
+        } else {
+            $tip.hide();
+        }
+    });
 }
 
 function renderMiniplot(plotid, data) {

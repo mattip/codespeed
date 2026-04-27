@@ -468,6 +468,7 @@ div.miniplot {
     float: left;
     height: 130px;
     width: 23%;
+    border: 1px solid #9DADC6;
     -moz-border-radius: 10px;
     -webkit-border-radius: 10px;
     border-radius: 10px;
@@ -475,6 +476,19 @@ div.miniplot {
 div.miniplot:hover { background-color: #F1F1F1; }
 .jqplot-highlighter-tooltip {
     -moz-border-radius: 10px; -webkit-border-radius: 10px; border-radius: 10px;
+}
+#dygraph-tooltip {
+    display: none;
+    position: absolute;
+    background: rgba(255,255,255,0.92);
+    border: 1px solid #9DADC6;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 100;
+    white-space: nowrap;
+    box-shadow: 2px 2px 4px rgba(0,0,0,0.15);
 }
 
 div.compplot {

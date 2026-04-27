@@ -3,7 +3,7 @@ var Comparison = (function(window){
 // Localize globals
 var readCheckbox = window.readCheckbox, getLoadText = window.getLoadText;
 
-var compdata, bench_units;
+var compdata, bench_units, dataCache = {};
 
 function getConfiguration() {
   return {
@@ -61,13 +61,14 @@ function refreshContent() {
   });
 }
 
-function savedata(data) {
+function savedata(cacheKey, data) {
   if (data.error !== "None") {
     var h = $("#content").height();//get height for error message
     $("#plotwrapper").html(getLoadText(data.error, h));
     return 1;
   }
   delete data.error;
+  dataCache[cacheKey] = data;
   compdata = data;
   refreshContent();
 }
@@ -91,9 +92,17 @@ function updateBaselineDropdown() {
 function loadData() {
   var conf = getConfiguration();
   if (!conf.exe || !conf.ben) { return; }
+  var cacheKey = conf.exe + "|" + conf.ben;
+  if (dataCache[cacheKey]) {
+    compdata = dataCache[cacheKey];
+    refreshContent();
+    return;
+  }
   var h = $("#content").height();
   $("#plotwrapper").html(getLoadText("Loading...", h));
-  $.getJSON("json/", {exe: conf.exe, ben: conf.ben}, savedata);
+  $.getJSON("json/", {exe: conf.exe, ben: conf.ben}, function(data) {
+    savedata(cacheKey, data);
+  });
 }
 
 function abortRender(plotid, message) {

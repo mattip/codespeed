@@ -111,7 +111,9 @@
                 labels: benchmarks,
                 datasets: [
                     {label: 'latest {{ default_exe }}', data: latestValues, backgroundColor: '#4e79a7'},
-                    {label: data['baseline'], data: baselineValues, backgroundColor: '#f28e2b'}
+                    {label: data['baseline'], data: baselineValues, type: 'line',
+                     borderColor: '#f28e2b', backgroundColor: 'transparent',
+                     pointRadius: 0, borderWidth: 2, fill: false}
                 ]
             },
             options: {
@@ -123,7 +125,7 @@
                 },
                 scales: {
                     x: {ticks: {maxRotation: 70, minRotation: 70, autoSkip: false, font: {size: 11}}},
-                    y: {min: 0, ticks: {callback: function(v) { return v.toFixed(2); }}}
+                    y: {min: 0, max: 2.0, ticks: {callback: function(v) { return v.toFixed(2); }}}
                 }
             }
         });

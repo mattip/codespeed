@@ -99,6 +99,8 @@ DEF_EXECUTABLES = [
                    {'name': 'pypy3.9-jit-64', 'project': 'PyPy3.9'},
                   ]
 DEF_ENVIRONMENT = 'benchmarker'
+CHART_ORIENTATION = 'horizontal'
+DEF_BENCHMARK = 'grid'
 
 
 from .local_settings import *

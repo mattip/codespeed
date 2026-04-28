@@ -196,13 +196,32 @@ def gethistoricaldata(request):
 @require_GET
 def getcomparisondata(request):
     executables, exekeys = getcomparisonexes()
+
+    requested_exes = None
+    if 'exe' in request.GET:
+        requested_exes = set(
+            i for i in request.GET['exe'].split(",") if i and i in exekeys
+        )
+
     benchmarks = Benchmark.objects.all()
+    if 'ben' in request.GET:
+        bench_ids = set()
+        for i in request.GET['ben'].split(","):
+            try:
+                bench_ids.add(int(i))
+            except ValueError:
+                pass
+        if bench_ids:
+            benchmarks = benchmarks.filter(id__in=bench_ids)
+
     environments = Environment.objects.all()
 
     compdata = {}
     compdata['error'] = "Unknown error"
     for proj in executables:
         for exe in executables[proj]:
+            if requested_exes is not None and exe['key'] not in requested_exes:
+                continue
             compdata[exe['key']] = {}
             for env in environments:
                 compdata[exe['key']][env.id] = {}
@@ -272,6 +291,30 @@ def comparison(request):
                 #TODO: log
                 pass
     if not checkedexecutables:
+        if hasattr(settings, 'DEF_EXECUTABLES') and settings.DEF_EXECUTABLES:
+            for exe_spec in settings.DEF_EXECUTABLES:
+                try:
+                    proj = Project.objects.get(name=exe_spec['project'])
+                    exe = Executable.objects.get(name=exe_spec['name'], project=proj)
+                    for key in exekeys:
+                        if key.startswith(str(exe.id) + "+L+"):
+                            checkedexecutables.append(key)
+                            break
+                except (Executable.DoesNotExist, Project.DoesNotExist):
+                    pass
+        if (not checkedexecutables and
+                hasattr(settings, 'DEF_BASELINES') and settings.DEF_BASELINES):
+            baselines = getbaselineexecutables()
+            for base_spec in settings.DEF_BASELINES:
+                for base in baselines:
+                    if base['key'] == "none":
+                        continue
+                    if (base['executable'].name == base_spec['executable'] and
+                            base['revision'].commitid == base_spec['revision']):
+                        if base['key'] in exekeys:
+                            checkedexecutables.append(base['key'])
+                        break
+    if not checkedexecutables:
         checkedexecutables = exekeys
 
     units_titles = Benchmark.objects.filter(
@@ -336,6 +379,19 @@ def comparison(request):
                 pass  # The selected baseline was not checked
         except:
             pass  # Keep "none" as default baseline
+
+    if selectedbaseline == "none" and 'bas' not in data:
+        if hasattr(settings, 'DEF_EXECUTABLES') and settings.DEF_EXECUTABLES:
+            try:
+                exe_spec = settings.DEF_EXECUTABLES[0]
+                proj = Project.objects.get(name=exe_spec['project'])
+                exe = Executable.objects.get(name=exe_spec['name'], project=proj)
+                for key in exekeys:
+                    if key.startswith(str(exe.id) + "+L+") and key in checkedexecutables:
+                        selectedbaseline = key
+                        break
+            except (Executable.DoesNotExist, Project.DoesNotExist):
+                pass
 
     selecteddirection = False
     if ('hor' in data and data['hor'] == "true" or

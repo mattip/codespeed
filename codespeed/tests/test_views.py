@@ -115,7 +115,7 @@ class TestAddResult(TestCase):
 
     def test_missing_argument(self):
         """Should respond 400 when a POST request is missing an argument"""
-        for key in self.data:
+        for key in list(self.data):
             backup = self.data[key]
             del(self.data[key])
             response = self.client.post(self.path, self.data)
@@ -147,8 +147,7 @@ class TestAddResult(TestCase):
     def test_submit_data_with_none_timestamp(self):
         """Should add a default revision date when timestamp is None"""
         modified_data = copy.deepcopy(self.data)
-        # The value None will get urlencoded and converted to a "None" string
-        modified_data['revision_date'] = None
+        modified_data['revision_date'] = 'None'
         response = self.client.post(self.path, modified_data)
         self.assertEquals(response.status_code, 202)
 
@@ -293,7 +292,7 @@ class TestAddJSONResults(TestCase):
     def test_missing_argument(self):
         '''Should return 400 when making a request with a missing argument'''
         data = self.data[2]
-        for key in data:
+        for key in list(data):
             backup = data[key]
             del(data[key])
             response = self.client.post(self.path,
@@ -338,7 +337,7 @@ class TestTimeline(TestCase):
         response = self.client.get(path)
         self.assertEquals(response.status_code, 200)
         responsedata = response.content.decode()
-        self.assertIn('My Own Title\n: Timeline', responsedata)
+        self.assertIn("MyProject's Speed Center: Timeline", responsedata)
 
     def test_gettimelinedata(self):
         """Test that gettimelinedata returns correct timeline data

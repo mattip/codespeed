@@ -58,5 +58,6 @@ class TestMercurial(TestCase):
                  project=self.pro).save()
 
     def test_hg(self):
-        response = self.client.get(reverse('displaylogs'), {'revisionid':1})
+        with self.settings(REPOSITORY_BASE_PATH=os.path.dirname(self.hgdir)):
+            response = self.client.get(reverse('displaylogs'), {'revisionid':1})
         assert response.status_code == 200, 'expected 200 got %d' % response.status_code

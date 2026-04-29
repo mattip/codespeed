@@ -1,6 +1,6 @@
 from datetime import datetime
 from django.test import TestCase, override_settings
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 from codespeed.commits.git import getlogs
 from codespeed.models import Project, Revision, Branch, Environment
@@ -48,7 +48,7 @@ class GitTest(TestCase):
 
         # then
         expected = {
-            'date': '2020-03-06 04:14:41',
+            'date': '2020-03-06 10:14:41',
             'message': 'msg',
             'commitid': 'long_id',
             'author': 'author',

@@ -317,23 +317,21 @@ def comparison(request):
     if not checkedexecutables:
         checkedexecutables = exekeys
 
-    units_titles = Benchmark.objects.filter(
-        benchmark_type="C"
-    ).values('units_title').distinct()
-    units_titles = [unit['units_title'] for unit in units_titles]
     benchmarks = {}
     bench_units = {}
-    for unit in units_titles:
-        # Only include benchmarks marked as cross-project
-        benchmarks[unit] = Benchmark.objects.filter(
-            benchmark_type="C"
-        ).filter(units_title=unit)
-        units = benchmarks[unit][0].units
-        lessisbetter = (benchmarks[unit][0].lessisbetter and
-                        ' (less is better)' or ' (more is better)')
-        bench_units[unit] = [
-            [b.id for b in benchmarks[unit]], lessisbetter, units
-        ]
+    for source_val, source_label in Benchmark.S_TYPES:
+        qs = Benchmark.objects.filter(source=source_val)
+        if not qs.exists():
+            continue
+        benchmarks[source_label] = qs
+        for unit in qs.values_list('units_title', flat=True).distinct():
+            unit_qs = qs.filter(units_title=unit)
+            units = unit_qs[0].units
+            lessisbetter = (unit_qs[0].lessisbetter and
+                            ' (less is better)' or ' (more is better)')
+            bench_units[unit] = [
+                [b.id for b in unit_qs], lessisbetter, units
+            ]
     checkedbenchmarks = []
     if 'ben' in data:
         checkedbenchmarks = []
@@ -345,9 +343,7 @@ def comparison(request):
             except Benchmark.DoesNotExist:
                 pass
     if not checkedbenchmarks:
-        # Only include benchmarks marked as cross-project
-        checkedbenchmarks = Benchmark.objects.filter(
-            benchmark_type="C", default_on_comparison=True)
+        checkedbenchmarks = Benchmark.objects.filter(default_on_comparison=True)
 
     charts = ['normal bars', 'stacked bars', 'relative bars']
     # Don't show relative charts as an option if there is only one executable

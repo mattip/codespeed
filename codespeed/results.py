@@ -69,6 +69,8 @@ def save_result(data, update_repo=True):
             b.units_title = data["units_title"]
         if "lessisbetter" in data:
             b.lessisbetter = data["lessisbetter"]
+        if "source" in data:
+            b.source = data["source"]
         b.full_clean()
         b.save()
 
@@ -127,6 +129,7 @@ def save_result(data, update_repo=True):
     r.val_max = data.get('max')
     r.q1 = data.get('q1')
     r.q3 = data.get('q3')
+    r.suite_version = data.get('suite_version', '')
 
     r.full_clean()
     r.save()

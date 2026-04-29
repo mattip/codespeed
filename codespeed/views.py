@@ -114,7 +114,8 @@ def gethistoricaldata(request):
         rev0 = rev[0]
         resname = '{} {}'.format(b['executable'], rev0.tag)
         baseline_results.append((resname, Result.objects.filter(
-            executable=baseline_exe, revision=rev0, environment=env)))
+            executable=baseline_exe, revision=rev0, environment=env,
+            benchmark__source='legacy')))
         if not baseline_results[-1][1]:
             logger.error('Could not find results for {} rev="{}" env="{}"'.format(
                     baseline_exe, rev0, env))
@@ -135,8 +136,10 @@ def gethistoricaldata(request):
             ).exclude(tag="").order_by('date')
         all_taggedrevs += default_taggedrevs
         for rev in default_taggedrevs:
+            # Filter to legacy only; pyperformance history can get its own panel later
             res = Result.objects.filter(
-                executable=_default_exe, revision=rev, environment=env)
+                executable=_default_exe, revision=rev, environment=env,
+                benchmark__source='legacy')
             if not res:
                 logger.info("no results for '%s' '%s' '%s'" % (str(_default_exe), str(rev), str(env)))
                 continue
@@ -160,7 +163,8 @@ def gethistoricaldata(request):
         default_lastrev = None
     if default_lastrev is not None:
         default_results['latest'] = Result.objects.filter(
-            executable=default_exe, revision=default_lastrev, environment=env)
+            executable=default_exe, revision=default_lastrev, environment=env,
+            benchmark__source='legacy')
 
     # Collect data
     benchmarks = []

@@ -161,6 +161,44 @@ class TestAddResult(TestCase):
         self.assertEqual(
             response.content.decode(), "Result data saved successfully")
 
+    def test_suite_version_is_saved(self):
+        """suite_version in the payload should be stored on the Result"""
+        modified_data = copy.deepcopy(self.data)
+        modified_data['suite_version'] = '2.3.1'
+        self.client.post(self.path, modified_data)
+        res = Result.objects.get(
+            revision__commitid='23',
+            benchmark__name='float',
+        )
+        self.assertEqual(res.suite_version, '2.3.1')
+
+    def test_suite_version_defaults_to_empty(self):
+        """Omitting suite_version should store an empty string"""
+        self.client.post(self.path, self.data)
+        res = Result.objects.get(
+            revision__commitid='23',
+            benchmark__name='float',
+        )
+        self.assertEqual(res.suite_version, '')
+
+    def test_source_set_on_new_benchmark(self):
+        """source in the payload should be set on an auto-created Benchmark"""
+        modified_data = copy.deepcopy(self.data)
+        modified_data['benchmark'] = 'newbench'
+        modified_data['source'] = 'pyperformance'
+        self.client.post(self.path, modified_data)
+        b = Benchmark.objects.get(name='newbench')
+        self.assertEqual(b.source, 'pyperformance')
+
+    def test_source_not_changed_on_existing_benchmark(self):
+        """source in the payload should not overwrite an existing Benchmark"""
+        self.client.post(self.path, self.data)
+        modified_data = copy.deepcopy(self.data)
+        modified_data['source'] = 'pyperformance'
+        self.client.post(self.path, modified_data)
+        b = Benchmark.objects.get(name='float')
+        self.assertEqual(b.source, 'legacy')
+
 
 @override_settings(ALLOW_ANONYMOUS_POST=True)
 class TestAddJSONResults(TestCase):

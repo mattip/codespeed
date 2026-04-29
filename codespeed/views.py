@@ -549,7 +549,8 @@ def get_timeline_for_benchmark(baseline_exe, baseline_rev, bench, environment, e
                         [
                             res.revision.date.strftime('%Y/%m/%d %H:%M:%S %z'),
                             res.value, val_max, q3, q1, val_min,
-                            res.revision.get_short_commitid(), res.revision.tag, branch.name
+                            res.revision.get_short_commitid(), res.revision.tag, branch.name,
+                            res.suite_version,
                         ]
                     )
                 else:
@@ -560,7 +561,8 @@ def get_timeline_for_benchmark(baseline_exe, baseline_rev, bench, environment, e
                         [
                             res.revision.date.strftime('%Y/%m/%d %H:%M:%S %z'),
                             res.value, std_dev,
-                            res.revision.get_short_commitid(), res.revision.tag, branch.name
+                            res.revision.get_short_commitid(), res.revision.tag, branch.name,
+                            res.suite_version,
                         ]
                     )
             timeline['branches'][branch.name][executable.id] = results

@@ -57,4 +57,4 @@ class GitTest(TestCase):
             'short_commit_id': 'id',
             'tag': 'tag',
         }
-        self.assertEquals([expected], logs)
+        self.assertEqual([expected], logs)

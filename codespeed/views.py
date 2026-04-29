@@ -222,26 +222,37 @@ def getcomparisondata(request):
 
     compdata = {}
     compdata['error'] = "Unknown error"
+    suite_versions = {}  # exe_key -> env_id -> sorted list of unique non-empty versions
     for proj in executables:
         for exe in executables[proj]:
             if requested_exes is not None and exe['key'] not in requested_exes:
                 continue
             compdata[exe['key']] = {}
+            suite_versions[exe['key']] = {}
             for env in environments:
                 compdata[exe['key']][env.id] = {}
 
                 # Load all results for this env/executable/revision in a
                 # dict for fast lookup
-                results = dict(Result.objects.filter(
+                rows = Result.objects.filter(
                     environment=env,
                     executable=exe['executable'],
                     revision=exe['revision'],
-                ).values_list('benchmark', 'value'))
+                ).values_list('benchmark', 'value', 'suite_version')
+
+                results = {}
+                env_versions = set()
+                for bench_id, value, sv in rows:
+                    results[bench_id] = value
+                    if sv:
+                        env_versions.add(sv)
 
                 for bench in benchmarks:
                     compdata[exe['key']][env.id][bench.id] = results.get(
                         bench.id, None)
+                suite_versions[exe['key']][env.id] = sorted(env_versions)
 
+    compdata['suite_versions'] = suite_versions
     compdata['error'] = "None"
 
     return HttpResponse(json.dumps(compdata))

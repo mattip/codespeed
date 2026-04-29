@@ -52,6 +52,22 @@ function refreshContent() {
       msg = '<p class="warning">Normalized stacked bars actually represent the weighted arithmetic sum, useful to spot which individual benchmarks take up the most time. Choosing different weightings from the "Normalization" menu will change the totals relative to one another. For the correct way to calculate total bars, the geometric mean must be used (see <a href="http://portal.acm.org/citation.cfm?id=5666.5673 " title="How not to lie with statistics: the correct way to summarize benchmark results">paper</a>)</p>';
   }
 
+  if (compdata && compdata.suite_versions) {
+    var mismatchedEnvs = enviros.filter(function(envId) {
+      var versions = new Set();
+      exes.forEach(function(exeKey) {
+        var sv = compdata.suite_versions[exeKey];
+        if (sv && sv[envId]) {
+          sv[envId].forEach(function(v) { versions.add(v); });
+        }
+      });
+      return versions.size > 1;
+    });
+    if (mismatchedEnvs.length > 0) {
+      msg += '<p class="warning">The executables being compared used different benchmark suite versions. Results may not be directly comparable.</p>';
+    }
+  }
+
   chartInstances.forEach(function(c) { c.destroy(); });
   chartInstances = [];
   $("#plotwrapper").fadeOut("fast", function() {

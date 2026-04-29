@@ -79,7 +79,7 @@ def getlogs(endrev, startrev):
             logger.debug('Failed to get tag', exc_info=True)
 
         tag = stdout.strip() if p.returncode == 0 else ""
-        date = datetime.datetime.fromtimestamp(
+        date = datetime.datetime.utcfromtimestamp(
             int(date_t)).strftime("%Y-%m-%d %H:%M:%S")
 
         logs.append({

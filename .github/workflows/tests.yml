@@ -20,4 +20,4 @@ jobs:
         run: pip install -e .
 
       - name: Run tests
-        run: python manage.py test codespeed
+        run: python manage.py test codespeed --settings=codespeed.tests.settings

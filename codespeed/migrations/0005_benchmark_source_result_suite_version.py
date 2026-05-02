@@ -18,7 +18,6 @@ class Migration(migrations.Migration):
             old_name='benchmark_type',
             new_name='source',
         ),
-        migrations.RunPython(remap_benchmark_type, migrations.RunPython.noop),
         migrations.AlterField(
             model_name='benchmark',
             name='source',
@@ -28,6 +27,7 @@ class Migration(migrations.Migration):
                 max_length=14,
             ),
         ),
+        migrations.RunPython(remap_benchmark_type, migrations.RunPython.noop),
         migrations.AddField(
             model_name='result',
             name='suite_version',

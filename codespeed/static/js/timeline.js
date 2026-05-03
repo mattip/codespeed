@@ -306,6 +306,7 @@ function renderPlot(data) {
                 x: xAxisOpts,
                 y: { valueRange: [0, null] }
             },
+            xRangePad: 20,
             connectSeparatedPoints: true,
             underlayCallback: function(canvas, area, g) {
                 versionBoundaries.forEach(function(b) {
@@ -417,6 +418,7 @@ function renderMiniplot(plotid, data) {
                 x: { drawAxis: false, drawGrid: false },
                 y: { drawAxis: false, drawGrid: false, valueRange: [0, null] }
             },
+            xRangePad: 20,
             connectSeparatedPoints: true,
             highlightCircleSize: 0
         }

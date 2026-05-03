@@ -39,6 +39,15 @@ class ProjectAdmin(admin.ModelAdmin):
 class BranchAdmin(admin.ModelAdmin):
     list_display = ('name', 'project', 'display_on_comparison_page')
     list_filter = ('project',)
+    actions = ['enable_comparison_page', 'disable_comparison_page']
+
+    @admin.action(description='Display selected branches on comparison page')
+    def enable_comparison_page(self, request, queryset):
+        queryset.update(display_on_comparison_page=True)
+
+    @admin.action(description='Hide selected branches from comparison page')
+    def disable_comparison_page(self, request, queryset):
+        queryset.update(display_on_comparison_page=False)
 
 
 @admin.register(Revision)

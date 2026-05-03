@@ -22,7 +22,7 @@ function getConfiguration() {
     ben: readCheckbox("input[name='benchmarks']:checked"),
     env: readCheckbox("input[name='environments']:checked"),
     hor: $("input[name='direction']").is(':checked'),
-    bas: $("#baseline option:selected").val(),
+    bas: $("#baseline option:selected").val() || "none",
     chart: $("#chart_type option:selected").val()
   };
 }
@@ -145,6 +145,7 @@ function loadData() {
 
 function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline, chart, horizontal) {
     // baseline may be "exe_key" or "exe_key:env_id" (for cross-env normalization)
+    if (!baseline) { baseline = "none"; }
     var baselineExe = baseline, baselineEnv = null;
     if (baseline !== "none" && baseline.indexOf(':') !== -1) {
         var bparts = baseline.split(':');

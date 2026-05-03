@@ -418,6 +418,15 @@ function renderMiniplot(plotid, data) {
         built.data.forEach(function(row) { row.push([bv, bv, bv]); });
     }
 
+    var miniWindow = null;
+    if (built.data.length === 1) {
+        var mx = built.data[0][0];
+        var mxv = (mx instanceof Date) ? mx.getTime() : mx;
+        miniWindow = (mx instanceof Date)
+            ? [new Date(mxv - 86400000), new Date(mxv + 86400000)]
+            : [mxv - 1, mxv + 1];
+    }
+
     var g = new Dygraph(
         document.getElementById(plotid),
         built.data,
@@ -433,6 +442,7 @@ function renderMiniplot(plotid, data) {
                 y: { drawAxis: false, drawGrid: false, valueRange: [0, null] }
             },
             xRangePad: 20,
+            dateWindow: miniWindow,
             connectSeparatedPoints: true,
             highlightCircleSize: 0
         }

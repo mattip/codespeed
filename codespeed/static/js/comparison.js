@@ -106,10 +106,19 @@ function updateBaselineDropdown() {
   var $baseline = $("#baseline");
   var current = $baseline.val();
   $baseline.find("option:not([value='none'])").remove();
+  var enviros = readCheckbox("input[name='environments']:checked").split(",").filter(Boolean);
+  var multiEnv = enviros.length > 1;
   $("input[name='executables']:checked").each(function() {
     var key = $(this).val();
     var name = $(this).next('label').text().trim();
-    $baseline.append($('<option>').val(key).text(name));
+    if (multiEnv) {
+      enviros.forEach(function(envId) {
+        var envName = $("label[for='env_" + envId + "']").text().trim();
+        $baseline.append($('<option>').val(key + ':' + envId).text(name + ' @ ' + envName));
+      });
+    } else {
+      $baseline.append($('<option>').val(key).text(name));
+    }
   });
   if ($baseline.find("option[value='" + current + "']").length) {
     $baseline.val(current);
@@ -135,7 +144,21 @@ function loadData() {
 }
 
 function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline, chart, horizontal) {
-    var baselineLabel = baseline !== "none" ? $("label[for='exe_" + baseline + "']").text().trim() : "";
+    // baseline may be "exe_key" or "exe_key:env_id" (for cross-env normalization)
+    var baselineExe = baseline, baselineEnv = null;
+    if (baseline !== "none" && baseline.indexOf(':') !== -1) {
+        var bparts = baseline.split(':');
+        baselineExe = bparts[0];
+        baselineEnv = bparts[1];
+    }
+
+    var baselineLabel = "";
+    if (baseline !== "none") {
+        baselineLabel = $("label[for='exe_" + baselineExe + "']").text().trim();
+        if (baselineEnv !== null) {
+            baselineLabel += ' @ ' + $("label[for='env_" + baselineEnv + "']").text().trim();
+        }
+    }
 
     var title;
     if (baseline === "none") {
@@ -164,15 +187,17 @@ function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline,
         for (var i = 0; i < exes.length; i++) {
             for (var j = 0; j < enviros.length; j++) {
                 var exeLabel = $("label[for='exe_" + exes[i] + "']").text().trim();
-                if (chart === "relative bars" && exes[i] === baseline) { continue; }
+                if (chart === "relative bars" && exes[i] === baselineExe &&
+                        (baselineEnv === null || baselineEnv === enviros[j])) { continue; }
                 var data = [];
                 for (var b = 0; b < benchmarks.length; b++) {
                     var val = compdata[exes[i]] && compdata[exes[i]][enviros[j]]
                         ? compdata[exes[i]][enviros[j]][benchmarks[b]]
                         : null;
                     if (val !== null && baseline !== "none") {
-                        var baseval = compdata[baseline] && compdata[baseline][enviros[j]]
-                            ? compdata[baseline][enviros[j]][benchmarks[b]]
+                        var envForBase = baselineEnv !== null ? baselineEnv : enviros[j];
+                        var baseval = compdata[baselineExe] && compdata[baselineExe][envForBase]
+                            ? compdata[baselineExe][envForBase][benchmarks[b]]
                             : null;
                         val = (baseval === null || baseval === 0) ? null : val / baseval;
                     }
@@ -205,8 +230,9 @@ function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline,
                         ? compdata[exes[i]][enviros[j]][benchmarks[b]]
                         : null;
                     if (val !== null && baseline !== "none") {
-                        var baseval = compdata[baseline] && compdata[baseline][enviros[j]]
-                            ? compdata[baseline][enviros[j]][benchmarks[b]]
+                        var envForBase = baselineEnv !== null ? baselineEnv : enviros[j];
+                        var baseval = compdata[baselineExe] && compdata[baselineExe][envForBase]
+                            ? compdata[baselineExe][envForBase][benchmarks[b]]
                             : null;
                         val = (baseval === null || baseval === 0) ? null : val / baseval;
                     }
@@ -219,6 +245,11 @@ function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline,
     }
 
     if (datasets.length === 0) { return; }
+
+    // Mark datasets where all values are null (baseline has no data for that env)
+    datasets.forEach(function(ds) {
+        ds.allNull = ds.data.every(function(v) { return v === null; });
+    });
 
     // Size the container
     var wrapWidth = $("#plotwrapper").width();
@@ -263,7 +294,19 @@ function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline,
                         font: {size: FONT_SIZE},
                         boxWidth: 20,
                         boxHeight: FONT_SIZE,
-                        padding: 8
+                        padding: 8,
+                        generateLabels: function(chart) {
+                            var items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                            items.forEach(function(item) {
+                                var ds = chart.data.datasets[item.datasetIndex];
+                                if (ds && ds.allNull) {
+                                    // Apply unicode combining strikethrough to each character
+                                    item.text = item.text.split('').join('\u0336') + '\u0336';
+                                    item.fontColor = '#aaa';
+                                }
+                            });
+                            return items;
+                        }
                     }
                 }
             },
@@ -314,7 +357,11 @@ function init(defaults) {
     $("#benchmark .checkall, #benchmark .uncheckall").click(loadData);
 
     // Re-render without re-fetching for other controls
-    $("#chart_type, #baseline, #direction, input[name='environments']").change(refreshContent);
+    $("#chart_type, #baseline, #direction").change(refreshContent);
+    $("input[name='environments']").change(function() {
+        updateBaselineDropdown();
+        refreshContent();
+    });
 
     $.ajaxSetup ({
       cache: false

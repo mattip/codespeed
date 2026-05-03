@@ -290,6 +290,19 @@ function renderPlot(data) {
 
     var lastHighlightPoints = null, lastHighlightX = null;
 
+    // When there's a single data point, xMin===xMax and Dygraph clips the dot
+    // at the canvas edge. Compute an explicit dateWindow with padding.
+    var singlePointWindow = null;
+    if (built.data.length === 1) {
+        var xVal = equidistant ? built.data[0][0] : built.data[0][0].getTime();
+        if (equidistant) {
+            singlePointWindow = [xVal - 1, xVal + 1];
+        } else {
+            var dayMs = 86400000;
+            singlePointWindow = [new Date(xVal - dayMs), new Date(xVal + dayMs)];
+        }
+    }
+
     plotInstance = new Dygraph(
         document.getElementById('plot'),
         built.data,
@@ -307,6 +320,7 @@ function renderPlot(data) {
                 y: { valueRange: [0, null] }
             },
             xRangePad: 20,
+            dateWindow: singlePointWindow,
             connectSeparatedPoints: true,
             underlayCallback: function(canvas, area, g) {
                 versionBoundaries.forEach(function(b) {

@@ -129,7 +129,7 @@ function updateBaselineDropdown() {
 
 function loadData() {
   var conf = getConfiguration();
-  if (!conf.exe || !conf.ben) { return; }
+  if (!conf.exe || !conf.ben) { refreshContent(); return; }
   var cacheKey = conf.exe + "|" + conf.ben;
   if (dataCache[cacheKey]) {
     compdata = dataCache[cacheKey];
@@ -372,6 +372,49 @@ function init(defaults) {
 
     $("#permalink").click(function() {
         window.location = "?" + $.param(getConfiguration());
+    });
+
+    $("#exportcsv").click(function(e) {
+        e.preventDefault();
+        if (!compdata) { return; }
+        var conf = getConfiguration();
+        var exes = conf.exe ? conf.exe.split(",").filter(Boolean) : [];
+        var enviros = readCheckbox("input[name='environments']:checked").split(",").filter(Boolean);
+        var benchmarks = conf.ben ? conf.ben.split(",").filter(Boolean) : [];
+
+        // Header row: benchmark, then one column per exe@env
+        var header = ["benchmark"];
+        for (var i = 0; i < exes.length; i++) {
+            for (var j = 0; j < enviros.length; j++) {
+                var exeLabel = $("label[for='exe_" + exes[i] + "']").text().trim();
+                var envLabel = $("label[for='env_" + enviros[j] + "']").text().trim();
+                header.push(enviros.length > 1 ? exeLabel + "@" + envLabel : exeLabel);
+            }
+        }
+
+        var rows = [header];
+        for (var b = 0; b < benchmarks.length; b++) {
+            var benchLabel = $("label[for='benchmark_" + benchmarks[b] + "']").text().trim();
+            var row = [benchLabel];
+            for (var i = 0; i < exes.length; i++) {
+                for (var j = 0; j < enviros.length; j++) {
+                    var val = compdata[exes[i]] && compdata[exes[i]][enviros[j]]
+                        ? compdata[exes[i]][enviros[j]][benchmarks[b]]
+                        : "";
+                    row.push(val === null || val === undefined ? "" : val);
+                }
+            }
+            rows.push(row);
+        }
+
+        var csv = rows.map(function(r) { return r.join(","); }).join("\n");
+        var blob = new Blob([csv], {type: "text/csv"});
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "comparison.csv";
+        a.click();
+        URL.revokeObjectURL(url);
     });
 }
 

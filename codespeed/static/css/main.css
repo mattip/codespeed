@@ -457,6 +457,8 @@ tbody.commits tr td.date {
 
 a#permalink { float: right; font-size: small; }
 a#permalink:hover { text-decoration: underline; }
+a#exportcsv { float: right; font-size: small; margin-right: 1em; }
+a#exportcsv:hover { text-decoration: underline; }
 
 /* Plot styles */
 div#plot { text-align: left; height: 500px; width: 100%; }

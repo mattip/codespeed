@@ -22,7 +22,7 @@ function getConfiguration() {
     ben: readCheckbox("input[name='benchmarks']:checked"),
     env: readCheckbox("input[name='environments']:checked"),
     hor: $("input[name='direction']").is(':checked'),
-    bas: $("#baseline option:selected").val(),
+    bas: $("#baseline option:selected").val() || "none",
     chart: $("#chart_type option:selected").val()
   };
 }
@@ -50,6 +50,22 @@ function refreshContent() {
     return false;
   } else if (conf.chart === "stacked bars" &&  conf.bas !== "none") {
       msg = '<p class="warning">Normalized stacked bars actually represent the weighted arithmetic sum, useful to spot which individual benchmarks take up the most time. Choosing different weightings from the "Normalization" menu will change the totals relative to one another. For the correct way to calculate total bars, the geometric mean must be used (see <a href="http://portal.acm.org/citation.cfm?id=5666.5673 " title="How not to lie with statistics: the correct way to summarize benchmark results">paper</a>)</p>';
+  }
+
+  if (compdata && compdata.suite_versions) {
+    var mismatchedEnvs = enviros.filter(function(envId) {
+      var versions = new Set();
+      exes.forEach(function(exeKey) {
+        var sv = compdata.suite_versions[exeKey];
+        if (sv && sv[envId]) {
+          sv[envId].forEach(function(v) { versions.add(v); });
+        }
+      });
+      return versions.size > 1;
+    });
+    if (mismatchedEnvs.length > 0) {
+      msg += '<p class="warning">The executables being compared used different benchmark suite versions. Results may not be directly comparable.</p>';
+    }
   }
 
   chartInstances.forEach(function(c) { c.destroy(); });
@@ -90,10 +106,19 @@ function updateBaselineDropdown() {
   var $baseline = $("#baseline");
   var current = $baseline.val();
   $baseline.find("option:not([value='none'])").remove();
+  var enviros = readCheckbox("input[name='environments']:checked").split(",").filter(Boolean);
+  var multiEnv = enviros.length > 1;
   $("input[name='executables']:checked").each(function() {
     var key = $(this).val();
     var name = $(this).next('label').text().trim();
-    $baseline.append($('<option>').val(key).text(name));
+    if (multiEnv) {
+      enviros.forEach(function(envId) {
+        var envName = $("label[for='env_" + envId + "']").text().trim();
+        $baseline.append($('<option>').val(key + ':' + envId).text(name + ' @ ' + envName));
+      });
+    } else {
+      $baseline.append($('<option>').val(key).text(name));
+    }
   });
   if ($baseline.find("option[value='" + current + "']").length) {
     $baseline.val(current);
@@ -104,7 +129,7 @@ function updateBaselineDropdown() {
 
 function loadData() {
   var conf = getConfiguration();
-  if (!conf.exe || !conf.ben) { return; }
+  if (!conf.exe || !conf.ben) { refreshContent(); return; }
   var cacheKey = conf.exe + "|" + conf.ben;
   if (dataCache[cacheKey]) {
     compdata = dataCache[cacheKey];
@@ -119,7 +144,22 @@ function loadData() {
 }
 
 function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline, chart, horizontal) {
-    var baselineLabel = baseline !== "none" ? $("label[for='exe_" + baseline + "']").text().trim() : "";
+    // baseline may be "exe_key" or "exe_key:env_id" (for cross-env normalization)
+    if (!baseline) { baseline = "none"; }
+    var baselineExe = baseline, baselineEnv = null;
+    if (baseline !== "none" && baseline.indexOf(':') !== -1) {
+        var bparts = baseline.split(':');
+        baselineExe = bparts[0];
+        baselineEnv = bparts[1];
+    }
+
+    var baselineLabel = "";
+    if (baseline !== "none") {
+        baselineLabel = $("label[for='exe_" + baselineExe + "']").text().trim();
+        if (baselineEnv !== null) {
+            baselineLabel += ' @ ' + $("label[for='env_" + baselineEnv + "']").text().trim();
+        }
+    }
 
     var title;
     if (baseline === "none") {
@@ -148,15 +188,17 @@ function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline,
         for (var i = 0; i < exes.length; i++) {
             for (var j = 0; j < enviros.length; j++) {
                 var exeLabel = $("label[for='exe_" + exes[i] + "']").text().trim();
-                if (chart === "relative bars" && exes[i] === baseline) { continue; }
+                if (chart === "relative bars" && exes[i] === baselineExe &&
+                        (baselineEnv === null || baselineEnv === enviros[j])) { continue; }
                 var data = [];
                 for (var b = 0; b < benchmarks.length; b++) {
                     var val = compdata[exes[i]] && compdata[exes[i]][enviros[j]]
                         ? compdata[exes[i]][enviros[j]][benchmarks[b]]
                         : null;
                     if (val !== null && baseline !== "none") {
-                        var baseval = compdata[baseline] && compdata[baseline][enviros[j]]
-                            ? compdata[baseline][enviros[j]][benchmarks[b]]
+                        var envForBase = baselineEnv !== null ? baselineEnv : enviros[j];
+                        var baseval = compdata[baselineExe] && compdata[baselineExe][envForBase]
+                            ? compdata[baselineExe][envForBase][benchmarks[b]]
                             : null;
                         val = (baseval === null || baseval === 0) ? null : val / baseval;
                     }
@@ -189,8 +231,9 @@ function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline,
                         ? compdata[exes[i]][enviros[j]][benchmarks[b]]
                         : null;
                     if (val !== null && baseline !== "none") {
-                        var baseval = compdata[baseline] && compdata[baseline][enviros[j]]
-                            ? compdata[baseline][enviros[j]][benchmarks[b]]
+                        var envForBase = baselineEnv !== null ? baselineEnv : enviros[j];
+                        var baseval = compdata[baselineExe] && compdata[baselineExe][envForBase]
+                            ? compdata[baselineExe][envForBase][benchmarks[b]]
                             : null;
                         val = (baseval === null || baseval === 0) ? null : val / baseval;
                     }
@@ -203,6 +246,11 @@ function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline,
     }
 
     if (datasets.length === 0) { return; }
+
+    // Mark datasets where all values are null (baseline has no data for that env)
+    datasets.forEach(function(ds) {
+        ds.allNull = ds.data.every(function(v) { return v === null; });
+    });
 
     // Size the container
     var wrapWidth = $("#plotwrapper").width();
@@ -247,7 +295,19 @@ function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline,
                         font: {size: FONT_SIZE},
                         boxWidth: 20,
                         boxHeight: FONT_SIZE,
-                        padding: 8
+                        padding: 8,
+                        generateLabels: function(chart) {
+                            var items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                            items.forEach(function(item) {
+                                var ds = chart.data.datasets[item.datasetIndex];
+                                if (ds && ds.allNull) {
+                                    // Apply unicode combining strikethrough to each character
+                                    item.text = item.text.split('').join('\u0336') + '\u0336';
+                                    item.fontColor = '#aaa';
+                                }
+                            });
+                            return items;
+                        }
                     }
                 }
             },
@@ -298,7 +358,11 @@ function init(defaults) {
     $("#benchmark .checkall, #benchmark .uncheckall").click(loadData);
 
     // Re-render without re-fetching for other controls
-    $("#chart_type, #baseline, #direction, input[name='environments']").change(refreshContent);
+    $("#chart_type, #baseline, #direction").change(refreshContent);
+    $("input[name='environments']").change(function() {
+        updateBaselineDropdown();
+        refreshContent();
+    });
 
     $.ajaxSetup ({
       cache: false
@@ -308,6 +372,49 @@ function init(defaults) {
 
     $("#permalink").click(function() {
         window.location = "?" + $.param(getConfiguration());
+    });
+
+    $("#exportcsv").click(function(e) {
+        e.preventDefault();
+        if (!compdata) { return; }
+        var conf = getConfiguration();
+        var exes = conf.exe ? conf.exe.split(",").filter(Boolean) : [];
+        var enviros = readCheckbox("input[name='environments']:checked").split(",").filter(Boolean);
+        var benchmarks = conf.ben ? conf.ben.split(",").filter(Boolean) : [];
+
+        // Header row: benchmark, then one column per exe@env
+        var header = ["benchmark"];
+        for (var i = 0; i < exes.length; i++) {
+            for (var j = 0; j < enviros.length; j++) {
+                var exeLabel = $("label[for='exe_" + exes[i] + "']").text().trim();
+                var envLabel = $("label[for='env_" + enviros[j] + "']").text().trim();
+                header.push(enviros.length > 1 ? exeLabel + "@" + envLabel : exeLabel);
+            }
+        }
+
+        var rows = [header];
+        for (var b = 0; b < benchmarks.length; b++) {
+            var benchLabel = $("label[for='benchmark_" + benchmarks[b] + "']").text().trim();
+            var row = [benchLabel];
+            for (var i = 0; i < exes.length; i++) {
+                for (var j = 0; j < enviros.length; j++) {
+                    var val = compdata[exes[i]] && compdata[exes[i]][enviros[j]]
+                        ? compdata[exes[i]][enviros[j]][benchmarks[b]]
+                        : "";
+                    row.push(val === null || val === undefined ? "" : val);
+                }
+            }
+            rows.push(row);
+        }
+
+        var csv = rows.map(function(r) { return r.join(","); }).join("\n");
+        var blob = new Blob([csv], {type: "text/csv"});
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "comparison.csv";
+        a.click();
+        URL.revokeObjectURL(url);
     });
 }
 

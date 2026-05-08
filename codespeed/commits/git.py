@@ -52,9 +52,12 @@ def getlogs(endrev, startrev):
     else:
         logfmt = '--format=format:%h%x00%H%x00%at%x00%an%x00%ae%x00%s%x00%b%x1e'
 
+    max_log_entries = getattr(settings, 'GIT_MAX_LOG_ENTRIES', 30)
+
     cmd = ["git", "log", logfmt]
 
     if endrev.commitid != startrev.commitid:
+        cmd.append("-n%d" % max_log_entries)
         cmd.append("%s...%s" % (startrev.commitid, endrev.commitid))
     else:
         cmd.append("-1")  # Only return one commit

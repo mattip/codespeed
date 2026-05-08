@@ -114,7 +114,8 @@ def gethistoricaldata(request):
         rev0 = rev[0]
         resname = '{} {}'.format(b['executable'], rev0.tag)
         baseline_results.append((resname, Result.objects.filter(
-            executable=baseline_exe, revision=rev0, environment=env)))
+            executable=baseline_exe, revision=rev0, environment=env,
+            benchmark__source='legacy')))
         if not baseline_results[-1][1]:
             logger.error('Could not find results for {} rev="{}" env="{}"'.format(
                     baseline_exe, rev0, env))
@@ -135,8 +136,10 @@ def gethistoricaldata(request):
             ).exclude(tag="").order_by('date')
         all_taggedrevs += default_taggedrevs
         for rev in default_taggedrevs:
+            # Filter to legacy only; pyperformance history can get its own panel later
             res = Result.objects.filter(
-                executable=_default_exe, revision=rev, environment=env)
+                executable=_default_exe, revision=rev, environment=env,
+                benchmark__source='legacy')
             if not res:
                 logger.info("no results for '%s' '%s' '%s'" % (str(_default_exe), str(rev), str(env)))
                 continue
@@ -160,7 +163,8 @@ def gethistoricaldata(request):
         default_lastrev = None
     if default_lastrev is not None:
         default_results['latest'] = Result.objects.filter(
-            executable=default_exe, revision=default_lastrev, environment=env)
+            executable=default_exe, revision=default_lastrev, environment=env,
+            benchmark__source='legacy')
 
     # Collect data
     benchmarks = []
@@ -218,26 +222,37 @@ def getcomparisondata(request):
 
     compdata = {}
     compdata['error'] = "Unknown error"
+    suite_versions = {}  # exe_key -> env_id -> sorted list of unique non-empty versions
     for proj in executables:
         for exe in executables[proj]:
             if requested_exes is not None and exe['key'] not in requested_exes:
                 continue
             compdata[exe['key']] = {}
+            suite_versions[exe['key']] = {}
             for env in environments:
                 compdata[exe['key']][env.id] = {}
 
                 # Load all results for this env/executable/revision in a
                 # dict for fast lookup
-                results = dict(Result.objects.filter(
+                rows = Result.objects.filter(
                     environment=env,
                     executable=exe['executable'],
                     revision=exe['revision'],
-                ).values_list('benchmark', 'value'))
+                ).values_list('benchmark', 'value', 'suite_version')
+
+                results = {}
+                env_versions = set()
+                for bench_id, value, sv in rows:
+                    results[bench_id] = value
+                    if sv:
+                        env_versions.add(sv)
 
                 for bench in benchmarks:
                     compdata[exe['key']][env.id][bench.id] = results.get(
                         bench.id, None)
+                suite_versions[exe['key']][env.id] = sorted(env_versions)
 
+    compdata['suite_versions'] = suite_versions
     compdata['error'] = "None"
 
     return HttpResponse(json.dumps(compdata))
@@ -317,23 +332,21 @@ def comparison(request):
     if not checkedexecutables:
         checkedexecutables = exekeys
 
-    units_titles = Benchmark.objects.filter(
-        benchmark_type="C"
-    ).values('units_title').distinct()
-    units_titles = [unit['units_title'] for unit in units_titles]
     benchmarks = {}
     bench_units = {}
-    for unit in units_titles:
-        # Only include benchmarks marked as cross-project
-        benchmarks[unit] = Benchmark.objects.filter(
-            benchmark_type="C"
-        ).filter(units_title=unit)
-        units = benchmarks[unit][0].units
-        lessisbetter = (benchmarks[unit][0].lessisbetter and
-                        ' (less is better)' or ' (more is better)')
-        bench_units[unit] = [
-            [b.id for b in benchmarks[unit]], lessisbetter, units
-        ]
+    for source_val, source_label in Benchmark.S_TYPES:
+        qs = Benchmark.objects.filter(source=source_val)
+        if not qs.exists():
+            continue
+        benchmarks[source_label] = qs
+        for unit in qs.values_list('units_title', flat=True).distinct():
+            unit_qs = qs.filter(units_title=unit)
+            units = unit_qs[0].units
+            lessisbetter = (unit_qs[0].lessisbetter and
+                            ' (less is better)' or ' (more is better)')
+            bench_units[unit] = [
+                [b.id for b in unit_qs], lessisbetter, units
+            ]
     checkedbenchmarks = []
     if 'ben' in data:
         checkedbenchmarks = []
@@ -345,9 +358,7 @@ def comparison(request):
             except Benchmark.DoesNotExist:
                 pass
     if not checkedbenchmarks:
-        # Only include benchmarks marked as cross-project
-        checkedbenchmarks = Benchmark.objects.filter(
-            benchmark_type="C", default_on_comparison=True)
+        checkedbenchmarks = Benchmark.objects.filter(default_on_comparison=True)
 
     charts = ['normal bars', 'stacked bars', 'relative bars']
     # Don't show relative charts as an option if there is only one executable
@@ -549,7 +560,8 @@ def get_timeline_for_benchmark(baseline_exe, baseline_rev, bench, environment, e
                         [
                             res.revision.date.strftime('%Y/%m/%d %H:%M:%S %z'),
                             res.value, val_max, q3, q1, val_min,
-                            res.revision.get_short_commitid(), res.revision.tag, branch.name
+                            res.revision.get_short_commitid(), res.revision.tag, branch.name,
+                            res.suite_version,
                         ]
                     )
                 else:
@@ -560,7 +572,8 @@ def get_timeline_for_benchmark(baseline_exe, baseline_rev, bench, environment, e
                         [
                             res.revision.date.strftime('%Y/%m/%d %H:%M:%S %z'),
                             res.value, std_dev,
-                            res.revision.get_short_commitid(), res.revision.tag, branch.name
+                            res.revision.get_short_commitid(), res.revision.tag, branch.name,
+                            res.suite_version,
                         ]
                     )
             timeline['branches'][branch.name][executable.id] = results

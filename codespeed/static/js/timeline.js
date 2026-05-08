@@ -84,13 +84,14 @@ function buildGraphData(branches, median, equidistant) {
                 var mid = pt[1];
                 var low, high, commit, tag;
 
+                var suite_version;
                 if (median) {
-                    // pt: [date, median, max, q3, q1, min, commit, tag, branch]
+                    // pt: [date, median, max, q3, q1, min, commit, tag, branch, suite_version]
                     var q1  = (pt[4] !== "") ? pt[4] : mid;
                     var q3  = (pt[3] !== "") ? pt[3] : mid;
                     var min = (pt[5] !== "") ? pt[5] : mid;
                     var max = (pt[2] !== "") ? pt[2] : mid;
-                    commit = pt[6]; tag = pt[7];
+                    commit = pt[6]; tag = pt[7]; suite_version = pt[9] || '';
                     if (shouldPlotExtrema()) {
                         low = min; high = max;
                     } else if (shouldPlotQuartiles()) {
@@ -99,16 +100,17 @@ function buildGraphData(branches, median, equidistant) {
                         low = mid; high = mid;
                     }
                 } else {
-                    // pt: [date, value, std_dev, commit, tag, branch]
+                    // pt: [date, value, std_dev, commit, tag, branch, suite_version]
                     var std = (pt[2] !== "" && pt[2] !== null) ? pt[2] : 0;
                     low = Math.max(0, mid - std);
                     high = mid + std;
-                    commit = pt[3]; tag = pt[4];
+                    commit = pt[3]; tag = pt[4]; suite_version = pt[6] || '';
                 }
 
                 dateIndex[dateKey] = new Date(dateKey.trim());
                 seriesRaw[exe_id][dateKey] = {low: low, mid: mid, high: high,
                                               commit: commit, tag: tag,
+                                              suite_version: suite_version,
                                               dateKey: dateKey};
             }
         }
@@ -136,7 +138,8 @@ function buildGraphData(branches, median, equidistant) {
             if (seriesRaw[id][dk]) {
                 var pt = seriesRaw[id][dk];
                 commitMap[dk][id] = {commit: pt.commit, tag: pt.tag,
-                                     low: pt.low, high: pt.high};
+                                     low: pt.low, high: pt.high,
+                                     suite_version: pt.suite_version};
             }
         });
     });
@@ -153,7 +156,7 @@ function buildGraphData(branches, median, equidistant) {
 
     return {labels: labels, colors: colors, data: graphData,
             commitMap: commitMap, sortedDateKeys: sortedDateKeys,
-            seriesIds: seriesIds, tsMap: tsMap};
+            seriesIds: seriesIds, tsMap: tsMap, dateIndex: dateIndex};
 }
 
 function renderPlot(data) {
@@ -192,7 +195,25 @@ function renderPlot(data) {
     var sortedDateKeys = built.sortedDateKeys;
     var seriesIds = built.seriesIds;
     var tsMap = built.tsMap;
+    var dateIndex = built.dateIndex;
     var env = $("input[name='environments']:checked").val();
+
+    // Find x-positions where suite_version changes between adjacent points
+    var seen = {};
+    var versionBoundaries = [];
+    sortedDateKeys.forEach(function(dk, idx) {
+        if (idx === 0) { return; }
+        var prevDk = sortedDateKeys[idx - 1];
+        seriesIds.forEach(function(id) {
+            var curr = commitMap[dk] && commitMap[dk][id];
+            var prev = commitMap[prevDk] && commitMap[prevDk][id];
+            if (curr && prev && curr.suite_version && prev.suite_version &&
+                    curr.suite_version !== prev.suite_version && !seen[dk]) {
+                seen[dk] = true;
+                versionBoundaries.push({dk: dk, idx: idx, label: curr.suite_version});
+            }
+        });
+    });
 
     // Map label -> color and label -> exeId for tooltip
     var colorMap = {};
@@ -236,6 +257,7 @@ function renderPlot(data) {
                 html += '<br><span style="font-size:0.85em;font-weight:normal;color:#666">' +
                         'commit: ' + info.commit;
                 if (info.tag) { html += '&nbsp;&nbsp;tag: ' + info.tag; }
+                if (versionBoundaries.length > 0 && info.suite_version) { html += '&nbsp;&nbsp;suite: ' + info.suite_version; }
                 html += '</span>';
             }
             html += '</div>';
@@ -268,6 +290,19 @@ function renderPlot(data) {
 
     var lastHighlightPoints = null, lastHighlightX = null;
 
+    // When there's a single data point, xMin===xMax and Dygraph clips the dot
+    // at the canvas edge. Compute an explicit dateWindow with padding.
+    var singlePointWindow = null;
+    if (built.data.length === 1) {
+        var xVal = equidistant ? built.data[0][0] : built.data[0][0].getTime();
+        if (equidistant) {
+            singlePointWindow = [xVal - 1, xVal + 1];
+        } else {
+            var dayMs = 86400000;
+            singlePointWindow = [new Date(xVal - dayMs), new Date(xVal + dayMs)];
+        }
+    }
+
     plotInstance = new Dygraph(
         document.getElementById('plot'),
         built.data,
@@ -284,7 +319,28 @@ function renderPlot(data) {
                 x: xAxisOpts,
                 y: { valueRange: [0, null] }
             },
+            xRangePad: 20,
+            dateWindow: singlePointWindow,
             connectSeparatedPoints: true,
+            underlayCallback: function(canvas, area, g) {
+                versionBoundaries.forEach(function(b) {
+                    var xval = equidistant ? b.idx : dateIndex[b.dk];
+                    var cx = g.toDomXCoord(xval);
+                    canvas.save();
+                    canvas.beginPath();
+                    canvas.moveTo(cx, area.y);
+                    canvas.lineTo(cx, area.y + area.h);
+                    canvas.strokeStyle = 'rgba(120, 120, 120, 0.6)';
+                    canvas.lineWidth = 1.5;
+                    canvas.setLineDash([4, 3]);
+                    canvas.stroke();
+                    canvas.setLineDash([]);
+                    canvas.fillStyle = 'rgba(80, 80, 80, 0.75)';
+                    canvas.font = '10px sans-serif';
+                    canvas.fillText(b.label, cx + 3, area.y + 12);
+                    canvas.restore();
+                });
+            },
             highlightSeriesOpts: { strokeWidth: 3 },
             highlightCircleSize: 5,
             highlightCallback: function(e, x, points) {
@@ -362,6 +418,15 @@ function renderMiniplot(plotid, data) {
         built.data.forEach(function(row) { row.push([bv, bv, bv]); });
     }
 
+    var miniWindow = null;
+    if (built.data.length === 1) {
+        var mx = built.data[0][0];
+        var mxv = (mx instanceof Date) ? mx.getTime() : mx;
+        miniWindow = (mx instanceof Date)
+            ? [new Date(mxv - 86400000), new Date(mxv + 86400000)]
+            : [mxv - 1, mxv + 1];
+    }
+
     var g = new Dygraph(
         document.getElementById(plotid),
         built.data,
@@ -376,6 +441,8 @@ function renderMiniplot(plotid, data) {
                 x: { drawAxis: false, drawGrid: false },
                 y: { drawAxis: false, drawGrid: false, valueRange: [0, null] }
             },
+            xRangePad: 20,
+            dateWindow: miniWindow,
             connectSeparatedPoints: true,
             highlightCircleSize: 0
         }

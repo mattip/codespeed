@@ -5,7 +5,7 @@
 </div>
 <div id="about" class="about_content clearfix">
 <h3>About this site</h3>
-<p>We have nightly benchmark runs of pypy, together with cpython data for
+<p>We have nightly benchmark runs of PyPy, together with CPython data for
 comparison. The current benchmarks have run since 2016 on a dedicated machine
 named <b>benchmarker</b>. Previously, we had other machines (<b>tannit</b> and
 briefly <b>speed-python</b>). The <b>benchmarker</b> machine is generously
@@ -16,23 +16,31 @@ specs are:</p>
 <li>Disk: 4TB TOSHIBA MG04ACA4</li>
 </ul>
 
-<p>This site runs on top of Django and Codespeed</p>
+<p>This site runs on top of <a href="https://www.djangoproject.com/">Django</a>
+and <a href="https://github.com/tobami/codespeed">Codespeed</a>.</p>
+
 <h3>About the benchmarks</h3>
 <p>The benchmark code can be found <a
 href="https://foss.heptapod.net/pypy/benchmarks">here</a>.</p>
-<p>This is a benchmark suite based on Unladen Swallow, adapted for PyPY and
-runs on Python2 and Python3. Also see <a
-href="https://speed.python.org">the python speed site</a></p>
+<p>This is a benchmark suite based on Unladen Swallow, adapted for PyPy and
+runs on Python2 and Python3. Also see the <a href="https://speed.python.org">
+speed.python.org</a> site.</p>
+
 <h3>About PyPy</h3>
 <p>PyPy is a very compliant implementation of the Python language.</p>
 <p>Main website: <a href="https://www.pypy.org">www.pypy.org</a></p>
-
+<p>Documentation: <a href="https://doc.pypy.org">doc.pypy.org</a></p>
 <p>Blog: <a href="https://www.pypy.org/blog/">www.pypy.org/blog/</a>
+
 <h3>About Codespeed</h3>
-Codespeed is a web application to monitor and analyze the performance of your code.
-<p>Code: <a href="https://github.com/python/codespeed/tree/speed.pypy.org">PyPy branch of python fork of codespeed</a>
-<p>Wiki: <a href="https://wiki.github.com/tobami/codespeed/">wiki.github.com/tobami/codespeed/</a></p>
+<a href="https://github.com/tobami/codespeed">Codespeed</a> is a web application
+to monitor and analyze the performance of your code.
+<p>The source code of this website can be found on the
+<a href="https://github.com/python/codespeed/tree/speed.pypy.org"><code>PyPy</code>
+branch</a> of the Python fork of codespeed.</p>
+
 <h3>Contact</h3>
-<p>For problems or suggestions about this website please file an issue on the github repo</p>
+<p>For problems or suggestions about this website, please file an issue in the
+<a href="https://github.com/python/codespeed">GitHub repository</a>.</p>
 </div>
 {% endblock %}

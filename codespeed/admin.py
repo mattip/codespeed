@@ -55,6 +55,7 @@ class RevisionAdmin(admin.ModelAdmin):
     list_display = ('commitid', 'branch', 'tag', 'date')
     list_filter = ('branch__project', 'branch', 'tag', 'date')
     search_fields = ('commitid', 'tag')
+    raw_id_fields = ('branch',)
 
 
 @admin.register(Executable)
@@ -87,6 +88,7 @@ class ResultAdmin(admin.ModelAdmin):
     list_display = ('revision', 'benchmark', 'executable', 'environment',
                     'value', 'date')
     list_filter = ('environment', 'executable', 'date', 'benchmark')
+    raw_id_fields = ('revision', 'benchmark', 'executable', 'environment')
 
 
 def recalculate_report(modeladmin, request, queryset):

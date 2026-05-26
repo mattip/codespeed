@@ -95,8 +95,6 @@ DEF_BASELINES = [
                 ]
 DEF_EXECUTABLES = [
                    {'name': 'pypy3.11-jit-64', 'project': 'PyPy3.11'},
-                   {'name': 'pypy3.10-jit-64', 'project': 'PyPy3.10'},
-                   {'name': 'pypy3.9-jit-64', 'project': 'PyPy3.9'},
                   ]
 DEF_ENVIRONMENT = 'benchmarker'
 CHART_ORIENTATION = 'horizontal'

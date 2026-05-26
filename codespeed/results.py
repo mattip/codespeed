@@ -77,13 +77,23 @@ def save_result(data, update_repo=True):
     try:
         rev = branch.revisions.get(commitid=data['commitid'].split(":")[-1])
     except Revision.DoesNotExist:
+        commitid = data['commitid'].split(':')[-1]
+        conflict = Revision.objects.filter(
+            commitid=commitid, branch__project=p
+        ).exclude(branch=branch).first()
+        if conflict:
+            return (
+                "Revision %s already exists on branch '%s'; "
+                "refusing to add it to branch '%s'" % (
+                    commitid, conflict.branch.name, data['branch'])
+            ), True
         rev_date = data.get("revision_date")
         # "None" (as string) can happen when we urlencode the POST data
         if not rev_date or rev_date in ["", "None"]:
             rev_date = datetime.today()
         # Only take the hash of a mercurial nnn:xxxhash commitid
         rev = Revision(branch=branch, project=p,
-                       commitid=data['commitid'].split(':')[-1],
+                       commitid=commitid,
                        date=rev_date)
         try:
             rev.full_clean()

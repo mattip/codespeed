@@ -3,7 +3,7 @@ var Changes = (function(window){
 // Localize globals
 var TIMELINE_URL = window.TIMELINE_URL, getLoadText = window.getLoadText;
 
-var currentproject, changethres, trendthres, projectmatrix, revisionboxes = {};
+var currentproject, changethres, trendthres, projectmatrix, revisionboxes = {}, revisiondata = {}, envhasresults = {};
 
 function getConfiguration(revision) {
     return {
@@ -82,6 +82,19 @@ function updateTable() {
     });
 }
 
+function updateRevisionMarkers(env_id) {
+    var has = {};
+    $.each(envhasresults[env_id] || [], function(_, commitid) { has[commitid] = true; });
+    var current = $("#revision").val();
+    var options = "";
+    $.each(revisiondata[currentproject] || [], function(_, r) {
+        var marker = has[r[1]] ? '● ' : '○ ';
+        options += "<option value='" + r[1] + "'>" + marker + r[0] + "</option>";
+    });
+    $("#revision").html(options);
+    $("#revision").val(current);
+}
+
 function refreshContent() {
     refreshContentTable($("#revision option:selected").val());
 }
@@ -110,8 +123,8 @@ function changeRevisions() {
         selected_project = projectmatrix[executable];
 
     if (selected_project !== currentproject) {
-        $("#revision").html(revisionboxes[selected_project]);
         currentproject = selected_project;
+        updateRevisionMarkers($("input[name='environment']:checked").val());
 
         //Give visual cue that the select box has changed
         var bgc = $("#revision").parent().parent().css("backgroundColor");
@@ -132,8 +145,10 @@ function config(c) {
 function init(defaults) {
     currentproject = defaults.project;
     projectmatrix = defaults.projectmatrix;
+    envhasresults = defaults.envhasresults || {};
 
     $.each(defaults.revisionlists, function(project, revs) {
+        revisiondata[project] = revs;
         var options = "";
         $.each(revs, function(index, r) {
             options += "<option value='" + r[1] + "'>" + r[0] + "</option>";
@@ -148,10 +163,14 @@ function init(defaults) {
     $("input[name='executable']").change(changeRevisions);
 
     $("#env" + defaults.environment).prop('checked', true);
-    $("input[name='environment']").change(refreshContent);
+    $("input[name='environment']").change(function() {
+        updateRevisionMarkers($("input[name='environment']:checked").val());
+        refreshContent();
+    });
 
     $("#revision").html(revisionboxes[defaults.project]);
     $("#revision").val(defaults.revision);
+    updateRevisionMarkers(defaults.environment);
     $("#revision").change(refreshContent);
 
     $("#permalink").click(function() {

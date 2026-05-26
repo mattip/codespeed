@@ -158,13 +158,13 @@ def download_db(request):
     try:
         _build_sqlite(path)
         f = open(path, 'rb')
-        os.unlink(path)  # unlink now; data survives until f is closed
         today = datetime.today().strftime('%Y-%m-%d')
         response = FileResponse(
             f,
             as_attachment=True,
             filename=f'codespeed-{today}.sqlite3',
         )
+        os.unlink(path)  # unlink after FileResponse reads the file size
         response.set_cookie(
             'codespeed_download_ready', '1',
             max_age=60, path='/', samesite='Lax',

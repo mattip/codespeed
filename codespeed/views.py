@@ -908,6 +908,16 @@ def changes(request):
             projectmatrix[e.id] = e.project.name
     projectmatrix = json.dumps(projectmatrix)
 
+    all_commitids = [rev.commitid for revisions in revisionlists.values() for rev in revisions]
+    env_has_results = {}
+    for env in enviros:
+        has = set(Result.objects.filter(
+            environment=env,
+            revision__commitid__in=all_commitids,
+        ).values_list('revision__commitid', flat=True).distinct())
+        env_has_results[str(env.id)] = list(has)
+    env_has_results = json.dumps(env_has_results)
+
     for project, revisions in revisionlists.items():
         revisionlists[project] = [
             (str(rev), rev.commitid) for rev in revisions
@@ -928,6 +938,7 @@ def changes(request):
         'executables': executables,
         'projectmatrix': projectmatrix,
         'revisionlists': revisionlists,
+        'env_has_results': env_has_results,
         'trends': trends,
     })
 

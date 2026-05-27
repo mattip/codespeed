@@ -405,11 +405,11 @@ class TestTimeline(TestCase):
             1,
             "there should be 1 timeline for master")
         self.assertEqual(
-            len(responsedata['timelines'][0]['branches']['master']['1']),
+            len(responsedata['timelines'][0]['branches']['master']['1:1']),
             2,
             "There are 2 datapoints")
         self.assertEqual(
-            responsedata['timelines'][0]['branches']['master']['1'][1],
+            responsedata['timelines'][0]['branches']['master']['1:1'][1],
             [u'2011/04/13 17:04:22 ', 2000.0, 1.11111, u'2', u'', u'master', u''])
 
 

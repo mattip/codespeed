@@ -451,11 +451,18 @@ def gettimelinedata(request):
     if not executables:
         timeline_list['error'] = "No executables selected"
         return HttpResponse(json.dumps(timeline_list))
-    environment = None
-    try:
-        environment = get_object_or_404(Environment, id=data.get('env'))
-    except ValueError:
-        Http404()
+
+    environments = []
+    for env_id in data.get('env', '').split(',')[:2]:
+        if not env_id:
+            continue
+        try:
+            environments.append(get_object_or_404(Environment, id=int(env_id)))
+        except (ValueError, Http404):
+            pass
+    if not environments:
+        timeline_list['error'] = "No environment selected"
+        return HttpResponse(json.dumps(timeline_list))
 
     number_of_revs, benchmarks = get_num_revs_and_benchmarks(data)
 
@@ -471,13 +478,13 @@ def gettimelinedata(request):
         next_benchmarks = int(next_benchmarks)
 
     resp = StreamingHttpResponse(stream_timeline(baseline_exe, baseline_rev, benchmarks, data,
-                                                 environment, executables, number_of_revs,
+                                                 environments, executables, number_of_revs,
                                                  next_benchmarks),
                                  content_type='application/json')
     return resp
 
 
-def stream_timeline(baseline_exe, baseline_rev, benchmarks, data, environment, executables,
+def stream_timeline(baseline_exe, baseline_rev, benchmarks, data, environments, executables,
                     number_of_revs, next_benchmarks):
     yield '{"timelines": ['
     num_results = {"results": 0}
@@ -493,7 +500,7 @@ def stream_timeline(baseline_exe, baseline_rev, benchmarks, data, environment, e
         num_benchmark += 1
 
         if not next_benchmarks or num_benchmark > next_benchmarks:
-            result = get_timeline_for_benchmark(baseline_exe, baseline_rev, bench, environment,
+            result = get_timeline_for_benchmark(baseline_exe, baseline_rev, bench, environments,
                                                 executables, number_of_revs, num_results)
             if result != "":
                 transmitted_benchmarks += 1
@@ -516,7 +523,7 @@ def stream_timeline(baseline_exe, baseline_rev, benchmarks, data, environment, e
         yield ']' + not_first + next_page + ', "error":"None"}\n'
 
 
-def get_timeline_for_benchmark(baseline_exe, baseline_rev, bench, environment, executables,
+def get_timeline_for_benchmark(baseline_exe, baseline_rev, bench, environments, executables,
                                number_of_revs, num_results):
     lessisbetter = bench.lessisbetter and ' (less is better)' or ' (more is better)'
     timeline = {
@@ -528,74 +535,67 @@ def get_timeline_for_benchmark(baseline_exe, baseline_rev, bench, environment, e
         'lessisbetter': lessisbetter,
         'branches': {},
         'baseline': "None",
+        'environments': [{'id': env.id, 'name': env.name} for env in environments],
     }
     append = False
     for branch in Branch.objects.filter(
             project__track=True, name=F('project__default_branch')):
-        # For now, we'll only work with default branches
-        for executable in executables:
-            if executable.project != branch.project:
-                continue
+        for environment in environments:
+            for executable in executables:
+                if executable.project != branch.project:
+                    continue
 
-            resultquery = Result.objects.filter(
-                benchmark=bench
-            ).filter(
-                environment=environment
-            ).filter(
-                executable=executable
-            ).filter(
-                revision__branch=branch
-            ).select_related(
-                "revision"
-            ).order_by('-revision__date')[:number_of_revs]
-            if not len(resultquery):
-                continue
-            timeline['branches'].setdefault(branch.name, {})
+                resultquery = Result.objects.filter(
+                    benchmark=bench,
+                    environment=environment,
+                    executable=executable,
+                    revision__branch=branch,
+                ).select_related(
+                    "revision"
+                ).order_by('-revision__date')[:number_of_revs]
+                if not len(resultquery):
+                    continue
+                timeline['branches'].setdefault(branch.name, {})
 
-            results = []
-            for res in resultquery:
-                if bench.data_type == 'M':
-                    q1, q3, val_max, val_min = get_stats_with_defaults(res)
-                    results.append(
-                        [
+                results = []
+                for res in resultquery:
+                    if bench.data_type == 'M':
+                        q1, q3, val_max, val_min = get_stats_with_defaults(res)
+                        results.append([
                             res.revision.date.strftime('%Y/%m/%d %H:%M:%S %z'),
                             res.value, val_max, q3, q1, val_min,
                             res.revision.get_short_commitid(), res.revision.tag, branch.name,
                             res.suite_version,
-                        ]
-                    )
-                else:
-                    std_dev = ""
-                    if res.std_dev is not None:
-                        std_dev = res.std_dev
-                    results.append(
-                        [
+                        ])
+                    else:
+                        std_dev = ""
+                        if res.std_dev is not None:
+                            std_dev = res.std_dev
+                        results.append([
                             res.revision.date.strftime('%Y/%m/%d %H:%M:%S %z'),
                             res.value, std_dev,
                             res.revision.get_short_commitid(), res.revision.tag, branch.name,
                             res.suite_version,
-                        ]
-                    )
-            timeline['branches'][branch.name][executable.id] = results
-            append = True
+                        ])
+                # Key is "exe_id:env_id" so multiple environments render as separate series
+                timeline['branches'][branch.name][f"{executable.id}:{environment.id}"] = results
+                append = True
     if baseline_rev is not None and append:
         try:
             baselinevalue = Result.objects.get(
                 executable=baseline_exe,
                 benchmark=bench,
                 revision=baseline_rev,
-                environment=environment
+                environment=environments[0],
             ).value
         except Result.DoesNotExist:
             timeline['baseline'] = "None"
         else:
-            # determine start and end revision (x axis)
-            # from longest data series
             results = []
             for branch in timeline['branches']:
-                for exe in timeline['branches'][branch]:
-                    if len(timeline['branches'][branch][exe]) > len(results):
-                        results = timeline['branches'][branch][exe]
+                for key in timeline['branches'][branch]:
+                    if len(timeline['branches'][branch][key]) > len(results):
+                        results = timeline['branches'][branch][key]
             end = results[0][0]
             start = results[len(results) - 1][0]
             timeline['baseline'] = [
@@ -625,6 +625,10 @@ def timeline(request):
     if not enviros:
         return no_environment_error(request)
     defaultenviro = get_default_environment(enviros, data)
+    if 'env' in data:
+        defaultenvironments = get_default_environment(enviros, data, multi=True)[:2]
+    else:
+        defaultenvironments = defaultenviro  # already respects DEF_ENVIRONMENT
 
     # Default Project
     defaultproject = Project.objects.filter(track=True)
@@ -643,6 +647,15 @@ def timeline(request):
             except Executable.DoesNotExist:
                 pass
 
+    if not checkedexecutables:
+        if hasattr(settings, 'DEF_EXECUTABLES') and settings.DEF_EXECUTABLES:
+            for def_exe in settings.DEF_EXECUTABLES:
+                try:
+                    proj = Project.objects.get(name=def_exe['project'])
+                    checkedexecutables.append(
+                        Executable.objects.get(name=def_exe['name'], project=proj))
+                except (Project.DoesNotExist, Executable.DoesNotExist):
+                    pass
     if not checkedexecutables:
         checkedexecutables = Executable.objects.filter(project__track=True)
 
@@ -671,12 +684,17 @@ def timeline(request):
         except ValueError:
             pass
 
-    lastrevisions = [10, 50, 200, 1000]
+    lastrevisions = [10, 15, 50, 200]
     defaultlast = settings.DEF_TIMELINE_LIMIT
-    if 'revs' in data:
-        if int(data['revs']) not in lastrevisions:
-            lastrevisions.append(data['revs'])
-        defaultlast = data['revs']
+    if 'revs' in data and data['revs']:
+        try:
+            revs_int = int(data['revs'])
+        except ValueError:
+            revs_int = None
+        if revs_int is not None:
+            if revs_int not in lastrevisions:
+                lastrevisions.append(revs_int)
+            defaultlast = revs_int
 
     benchmarks = Benchmark.objects.all()
 
@@ -733,6 +751,7 @@ def timeline(request):
         'baseline': baseline,
         'defaultbenchmark': defaultbenchmark,
         'defaultenvironment': defaultenviro,
+        'defaultenvironments': defaultenvironments,
         'lastrevisions': lastrevisions,
         'defaultlast': defaultlast,
         'executables': executables,

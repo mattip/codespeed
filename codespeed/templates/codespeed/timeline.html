@@ -23,8 +23,8 @@
     <ul>
     {% for env in environments %}
       <li title="{{ env.os }}, {{ env.cpu }}">
-        <input id="env{{ env.name }}" type="radio" name="environments" value="{{ env.id }}" />
-        <label for="env{{ env.name }}">{{ env }}</label>
+        <input id="env{{ env.name }}" type="checkbox" name="environments" value="{{ env.id }}" />
+        <label for="env{{ env.name }}">{{ env }}</label><div class="envlinecolor"></div>
       </li>
     {% endfor %}
     </ul>
@@ -77,7 +77,7 @@
 </div>
 
 <div id="configbar">
-  <span class="options" title="Last {{ defaultlast }} revisions tested">
+  <span class="options">
     Show the last
     <select id="revisions">{% for rev in lastrevisions %}
       <option value="{{ rev }}">{{ rev }}</option>{% endfor %}
@@ -121,7 +121,7 @@
       executables: [{% for exe in checkedexecutables %}{{ exe.id }}, {% endfor %}],
       branches: [{% for b in branch_list %}"{{ branch }}", {% endfor %}],
       benchmark: "{{ defaultbenchmark }}",
-      environment: "{{ defaultenvironment.0.id }}",
+      environments: [{% for env in defaultenvironments %}{{ env.id }}, {% endfor %}],
       equidistant: "{{ defaultequid }}",
       quartiles: "{{ defaultquarts }}",
       extrema: "{{ defaultextr }}"

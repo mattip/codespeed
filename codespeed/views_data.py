@@ -21,15 +21,14 @@ def get_default_environment(enviros, data, multi=False):
     # Use permalink values
     if 'env' in data:
         for env_value in data['env'].split(","):
+            try:
+                env_id = int(env_value)
+            except ValueError:
+                continue
             for env in enviros:
-                try:
-                    env_id = int(env_value)
-                except ValueError:
-                    # Not an int
-                    continue
-                for env in enviros:
-                    if env_id == env.id:
-                        defaultenviros.append(env)
+                if env_id == env.id:
+                    defaultenviros.append(env)
+                    break
             if not multi:
                 break
     # Use settings.py value
@@ -91,7 +90,8 @@ def getbaselineexecutables(include_tags=None):
                 if base['key'] == "none":
                     continue
                 if (base['executable'].name == exename and
-                        base['revision'].commitid == commitid):
+                        (base['revision'].commitid == commitid or
+                         base['revision'].tag == commitid)):
                     baseline.remove(base)
                     baseline.insert(1, base)
                     break

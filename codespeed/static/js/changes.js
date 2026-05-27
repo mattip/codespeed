@@ -93,6 +93,9 @@ function updateRevisionMarkers(env_id) {
     });
     $("#revision").html(options);
     $("#revision").val(current);
+    if (!$("#revision").val()) {
+        $("#revision").prop('selectedIndex', 0);
+    }
 }
 
 function refreshContent() {
@@ -123,8 +126,19 @@ function changeRevisions() {
         selected_project = projectmatrix[executable];
 
     if (selected_project !== currentproject) {
+        var oldRevs = revisiondata[currentproject] || [];
+        var oldEntry = oldRevs.find(function(r) { return r[1] === $("#revision").val(); });
+        var oldDate = oldEntry ? new Date(oldEntry[0].slice(0, 19)) : null;
         currentproject = selected_project;
         updateRevisionMarkers($("input[name='environment']:checked").val());
+        if (oldDate) {
+            var newRevs = revisiondata[currentproject] || [];
+            var best = newRevs.reduce(function(bi, r, i) {
+                return Math.abs(new Date(r[0].slice(0, 19)) - oldDate) <
+                       Math.abs(new Date(newRevs[bi][0].slice(0, 19)) - oldDate) ? i : bi;
+            }, 0);
+            $("#revision").prop('selectedIndex', best);
+        }
 
         //Give visual cue that the select box has changed
         var bgc = $("#revision").parent().parent().css("backgroundColor");

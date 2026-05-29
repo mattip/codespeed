@@ -51,9 +51,9 @@
     {% for bench in benchlist|dictsort:"name" %}
     <li title="{{ bench.description }}">
       {% if bench in checkedbenchmarks %}
-        <input id="benchmark_{{ bench.id }}" type="checkbox" name="benchmarks" value="{{ bench.id }}" checked />
+        <input id="benchmark_{{ bench.id }}" type="checkbox" name="benchmarks" value="{{ bench.id }}" data-source="{{ bench.source }}" checked />
       {% else %}
-        <input id="benchmark_{{ bench.id }}" type="checkbox" name="benchmarks" value="{{ bench.id }}" />
+        <input id="benchmark_{{ bench.id }}" type="checkbox" name="benchmarks" value="{{ bench.id }}" data-source="{{ bench.source }}" />
       {% endif %}
       <label for="benchmark_{{ bench.id }}">{{ bench }}</label>
     </li>{% endfor %}
@@ -80,7 +80,7 @@
   <a id="permalink" href="#">Permalink</a>
   <a id="exportcsv" href="#">Export CSV</a>
 </div>
-<div id="geomean-summary" style="padding: 6px 10px; font-size: 14px;"></div>
+<div id="graph-title" style="text-align:center; padding:8px 0; font-size:15px;"></div>
 <div id="content" class="clearfix">
 <div id="plotwrapper"></div>
 </div>

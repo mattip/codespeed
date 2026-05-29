@@ -74,7 +74,7 @@ def getbaselineexecutables(include_tags=None):
         for exe in [e for e in executables if e.project == rev.branch.project]:
             exestring = get_sanitized_executable_name_for_timeline_view(exe)
             name = exestring + " " + rev.tag
-            key = str(exe.id) + "+" + str(rev.id)
+            key = str(exe.id) + ":" + str(rev.id)
             baseline.append({
                 'key': key,
                 'executable': exe,
@@ -151,7 +151,7 @@ def getcomparisonexes():
                     name = exestring + " latest"
                     if branch.name != proj.default_branch:
                         name += " in branch '" + branch.name + "'"
-                    key = str(exe.id) + "+L+" + branch.name
+                    key = str(exe.id) + ":L:" + branch.name
                     executablekeys.append(key)
                     executables.append({
                         'key': key,

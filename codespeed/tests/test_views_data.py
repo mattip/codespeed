@@ -84,29 +84,29 @@ class TestGetComparisonExes(TestCase):
         self.assertEqual(executables[self.project][0]['revision'],
                          self.revision_1_master)
         self.assertEqual(executables[self.project][0]['key'],
-                         '1+L+master')
+                         '1:L:master')
         self.assertEqual(executables[self.project][0]['name'],
                          'TestExecutable1 latest')
         self.assertEqual(executables[self.project][0]['revision'],
                          self.revision_1_master)
 
         self.assertEqual(executables[self.project][1]['key'],
-                         '2+L+master')
+                         '2:L:master')
         self.assertEqual(executables[self.project][1]['name'],
                          'TestExecutable2 latest')
 
         self.assertEqual(executables[self.project][2]['key'],
-                         '1+L+custom')
+                         '1:L:custom')
         self.assertEqual(executables[self.project][2]['name'],
                          'TestExecutable1 latest in branch \'custom\'')
 
         self.assertEqual(executables[self.project][3]['key'],
-                         '2+L+custom')
+                         '2:L:custom')
         self.assertEqual(executables[self.project][3]['name'],
                          'TestExecutable2 latest in branch \'custom\'')
 
-        self.assertEqual(exe_keys[0], '1+L+master')
-        self.assertEqual(exe_keys[1], '2+L+master')
+        self.assertEqual(exe_keys[0], '1:L:master')
+        self.assertEqual(exe_keys[1], '2:L:master')
 
     def test_get_comparisonexes_custom_default_branch(self):
         # Custom default branch is used
@@ -123,31 +123,31 @@ class TestGetComparisonExes(TestCase):
         self.assertEqual(executables[self.project][0]['revision'],
                          self.revision_1_master)
         self.assertEqual(executables[self.project][0]['key'],
-                         '1+L+master')
+                         '1:L:master')
         self.assertEqual(executables[self.project][0]['name'],
                          'TestExecutable1 latest in branch \'master\'')
         self.assertEqual(executables[self.project][0]['revision'],
                          self.revision_1_master)
 
         self.assertEqual(executables[self.project][1]['key'],
-                         '2+L+master')
+                         '2:L:master')
         self.assertEqual(executables[self.project][1]['name'],
                          'TestExecutable2 latest in branch \'master\'')
 
         self.assertEqual(executables[self.project][2]['key'],
-                         '1+L+custom')
+                         '1:L:custom')
         self.assertEqual(executables[self.project][2]['name'],
                          'TestExecutable1 latest')
 
         self.assertEqual(executables[self.project][3]['key'],
-                         '2+L+custom')
+                         '2:L:custom')
         self.assertEqual(executables[self.project][3]['name'],
                          'TestExecutable2 latest')
 
-        self.assertEqual(exe_keys[0], '1+L+master')
-        self.assertEqual(exe_keys[1], '2+L+master')
-        self.assertEqual(exe_keys[2], '1+L+custom')
-        self.assertEqual(exe_keys[3], '2+L+custom')
+        self.assertEqual(exe_keys[0], '1:L:master')
+        self.assertEqual(exe_keys[1], '2:L:master')
+        self.assertEqual(exe_keys[2], '1:L:custom')
+        self.assertEqual(exe_keys[3], '2:L:custom')
 
     def test_get_comparisonexes_branch_filtering(self):
         # branch1 and branch3 have display_on_comparison_page flag set to False
@@ -169,12 +169,12 @@ class TestGetComparisonExes(TestCase):
         self.assertEqual(len(exe_keys), 6)
 
         expected_exe_keys = [
-            '1+L+master',
-            '2+L+master',
-            '1+L+custom',
-            '2+L+custom',
-            '1+L+branch2',
-            '2+L+branch2'
+            '1:L:master',
+            '2:L:master',
+            '1:L:custom',
+            '2:L:custom',
+            '1:L:branch2',
+            '2:L:branch2'
         ]
         self.assertEqual(exe_keys, expected_exe_keys)
 

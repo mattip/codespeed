@@ -27,6 +27,90 @@ function getConfiguration() {
   };
 }
 
+function updateGeomeanSummary(exes, enviros, bens, baseline, chart) {
+    var $summary = $("#geomean-summary");
+    if (enviros.length !== 1 || exes.length !== 2 || baseline === "none" ||
+            chart === "stacked bars" || !compdata) {
+        $summary.html("");
+        return;
+    }
+
+    var baselineExe = baseline, baselineEnv = null;
+    if (baseline.indexOf(':') !== -1) {
+        var bparts = baseline.split(':');
+        baselineExe = bparts[0];
+        baselineEnv = bparts[1];
+    }
+
+    var otherExes = exes.filter(function(e) { return e !== baselineExe; });
+    if (otherExes.length !== 1) { $summary.html(""); return; }
+    var otherExe = otherExes[0];
+
+    var envId = enviros[0];
+    var envForBase = baselineEnv !== null ? baselineEnv : envId;
+
+    var product = 1, count = 0;
+    for (var b = 0; b < bens.length; b++) {
+        var val = compdata[otherExe] && compdata[otherExe][envId]
+            ? compdata[otherExe][envId][bens[b]]
+            : null;
+        var baseval = compdata[baselineExe] && compdata[baselineExe][envForBase]
+            ? compdata[baselineExe][envForBase][bens[b]]
+            : null;
+        if (val !== null && baseval !== null && baseval !== 0 && val > 0) {
+            product *= val / baseval;
+            count++;
+        }
+    }
+
+    if (count === 0) { $summary.html(""); return; }
+
+    var geomean = Math.pow(product, 1 / count);
+
+    // Determine whether all selected benchmarks are less-is-better or more-is-better
+    var lessCount = 0, moreCount = 0;
+    var benSet = {};
+    for (var b = 0; b < bens.length; b++) { benSet[bens[b]] = true; }
+    for (var unit in bench_units) {
+        var unitBens = bench_units[unit][0];
+        var unitLess = bench_units[unit][1].indexOf("less") !== -1;
+        for (var ub = 0; ub < unitBens.length; ub++) {
+            if (benSet[unitBens[ub]]) {
+                if (unitLess) { lessCount++; } else { moreCount++; }
+            }
+        }
+    }
+
+    var otherLabel = $("label[for='exe_" + otherExe + "']").text().trim();
+    var baselineLabel = $("label[for='exe_" + baselineExe + "']").text().trim();
+    if (baselineEnv !== null) {
+        baselineLabel += ' @ ' + $("label[for='env_" + baselineEnv + "']").text().trim();
+    }
+
+    var suffix;
+    if (moreCount === 0 && lessCount > 0) {
+        // All less-is-better: ratio < 1 means faster
+        if (geomean < 1) {
+            suffix = ' or <strong>' + (1 / geomean).toFixed(1) + '&times;</strong> faster';
+        } else {
+            suffix = ' or <strong>' + geomean.toFixed(1) + '&times;</strong> slower';
+        }
+    } else if (lessCount === 0 && moreCount > 0) {
+        // All more-is-better: ratio > 1 means faster
+        if (geomean > 1) {
+            suffix = ' or <strong>' + geomean.toFixed(1) + '&times;</strong> faster';
+        } else {
+            suffix = ' or <strong>' + (1 / geomean).toFixed(1) + '&times;</strong> slower';
+        }
+    } else {
+        suffix = ' relative to baseline';
+    }
+
+    $summary.html('The geometric average of ' + count + ' benchmarks for <strong>' +
+        otherLabel + '</strong> is <strong>' + geomean.toFixed(2) + '</strong>' +
+        suffix + ' than the baseline <strong>' + baselineLabel + '</strong>');
+}
+
 function refreshContent() {
   var conf = getConfiguration(),
       exes = conf.exe.split(","),
@@ -34,6 +118,7 @@ function refreshContent() {
       enviros = conf.env.split(","),
       msg = "";
 
+  $("#geomean-summary").html("");
   var h = $("#plotwrapper").height();//get height for error message
   if (exes[0] === "") {
     $("#plotwrapper").html('<p class="warning">No executables selected</p>');
@@ -87,6 +172,7 @@ function refreshContent() {
       plotcounter++;
       renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, conf.bas, conf.chart, conf.hor);
     }
+    updateGeomeanSummary(exes, enviros, bens, conf.bas, conf.chart);
   });
 }
 

@@ -6,21 +6,27 @@
 <div id="about" class="about_content clearfix">
 <h3>About this site</h3>
 <p>We have nightly benchmark runs of PyPy, together with CPython data for
-comparison. The current benchmarks have run since 2016 on a dedicated machine
+comparison. The benchmarks have run since 2016 on a dedicated machine
 named <b>benchmarker</b>. Previously, we had other machines (<b>tannit</b> and
 briefly <b>speed-python</b>). The <b>benchmarker</b> machine is generously
 donated by <a href="https://baroquesoftware.com">Baroque Software</a>. The
 specs are:</p>
-<ul><li>Processor: Intel(R) Core(TM) i7-7700 CPU @ 3.60GHz</li>
+<ul><li>Processor: Intel(R) Core(TM) i7-7700 CPU @ 3.60GHz with turbo enabled</li>
 <li>RAM: 64GB Micron DDR4 2400 MHz</li>
 <li>Disk: 4TB TOSHIBA MG04ACA4</li>
+</ul>
+<p>Benchmarks are also run on <b>benchmarker2</b>:</p>
+<ul><li>Processor: AMD Ryzen 5 3600 pinned to 3.60GHz, turnbo disabled</li>
+<li>RAM: 64GB</li>
+<li>Benchmarking pinned with cpuset partitions to CPUs3,4,5 with SMT
+(hyper-threading) disabled </li>
 </ul>
 
 <h3>About the benchmarks</h3>
 <p>The benchmark code can be found <a
 href="https://foss.heptapod.net/pypy/benchmarks">here</a>.</p>
 <p>This is a benchmark suite based on Unladen Swallow, adapted for PyPy and
-runs on Python2 and Python3. Also see the <a href="https://speed.python.org">
+runs on Python2 and Python3.<br>Also see the <a href="https://speed.python.org">
 speed.python.org</a> site.</p>
 
 <h3>About PyPy</h3>
@@ -34,7 +40,8 @@ speed.python.org</a> site.</p>
 to monitor and analyze the performance of your code.
 <p>The source code of this website can be found on the
 <a href="https://github.com/python/codespeed/tree/speed.pypy.org"><code>PyPy</code>
-branch</a> of the Python fork of codespeed.</p>
+branch</a> of the Python fork of codespeed{% if commit %},
+currently at commit <a href="https://github.com/python/codespeed/commit/{{ commit }}"><code>{{ commit|slice:":12" }}</code></a>{% endif %}.</p>
 
 <h3>Contact</h3>
 <p>For problems or suggestions about this website, please file an issue in the

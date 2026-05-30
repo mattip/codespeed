@@ -197,6 +197,32 @@ def gethistoricaldata(request):
     return HttpResponse(json.dumps(data))
 
 
+def _normalize_exe_key(key):
+    """Normalize old + separator to : for backwards URL compatibility."""
+    return key.replace('+', ':')
+
+
+def _parse_ben_param(ben_val):
+    """Parse the ben= query parameter. Returns a queryset/list or None for 'all'.
+
+    Accepts: 'all', source slugs ('legacy', 'pyperformance', 'legacy,pyperformance'),
+    or comma-separated numeric IDs (legacy behaviour).
+    """
+    if not ben_val or ben_val == 'all':
+        return None  # caller interprets None as "all benchmarks"
+    parts = [p for p in ben_val.split(',') if p]
+    source_vals = {sv for sv, _ in Benchmark.S_TYPES}
+    if parts and all(p in source_vals for p in parts):
+        return list(Benchmark.objects.filter(source__in=parts))
+    result = []
+    for i in parts:
+        try:
+            result.append(Benchmark.objects.get(id=int(i)))
+        except (Benchmark.DoesNotExist, ValueError):
+            pass
+    return result
+
+
 @require_GET
 def getcomparisondata(request):
     executables, exekeys = getcomparisonexes()
@@ -204,19 +230,15 @@ def getcomparisondata(request):
     requested_exes = None
     if 'exe' in request.GET:
         requested_exes = set(
-            i for i in request.GET['exe'].split(",") if i and i in exekeys
+            _normalize_exe_key(i) for i in request.GET['exe'].split(",")
+            if i and _normalize_exe_key(i) in exekeys
         )
 
     benchmarks = Benchmark.objects.all()
     if 'ben' in request.GET:
-        bench_ids = set()
-        for i in request.GET['ben'].split(","):
-            try:
-                bench_ids.add(int(i))
-            except ValueError:
-                pass
-        if bench_ids:
-            benchmarks = benchmarks.filter(id__in=bench_ids)
+        result = _parse_ben_param(request.GET['ben'])
+        if result is not None:
+            benchmarks = benchmarks.filter(id__in=[b.id for b in result])
 
     environments = Environment.objects.all()
 
@@ -281,19 +303,20 @@ def comparison(request):
         for i in data['exe'].split(","):
             if not i:
                 continue
+            i = _normalize_exe_key(i)
             if i in exekeys:
                 checkedexecutables.append(i)
     elif hasattr(settings, 'COMP_EXECUTABLES') and settings.COMP_EXECUTABLES:
         for exe, rev in settings.COMP_EXECUTABLES:
             try:
                 exe = Executable.objects.get(name=exe)
-                key = str(exe.id) + "+"
+                key = str(exe.id) + ":"
                 if rev == "L":
                     key += rev
                 else:
                     rev = Revision.objects.get(commitid=rev)
                     key += str(rev.id)
-                key += "+%s" % (exe.project.default_branch)
+                key += ":%s" % (exe.project.default_branch)
                 if key in exekeys:
                     checkedexecutables.append(key)
                 else:
@@ -312,7 +335,7 @@ def comparison(request):
                     proj = Project.objects.get(name=exe_spec['project'])
                     exe = Executable.objects.get(name=exe_spec['name'], project=proj)
                     for key in exekeys:
-                        if key.startswith(str(exe.id) + "+L+"):
+                        if key.startswith(str(exe.id) + ":L:"):
                             checkedexecutables.append(key)
                             break
                 except (Executable.DoesNotExist, Project.DoesNotExist):
@@ -349,14 +372,9 @@ def comparison(request):
             ]
     checkedbenchmarks = []
     if 'ben' in data:
-        checkedbenchmarks = []
-        for i in data['ben'].split(","):
-            if not i:
-                continue
-            try:
-                checkedbenchmarks.append(Benchmark.objects.get(id=int(i)))
-            except Benchmark.DoesNotExist:
-                pass
+        checkedbenchmarks = _parse_ben_param(data['ben'])
+        if checkedbenchmarks is None:
+            checkedbenchmarks = list(Benchmark.objects.all())
     if not checkedbenchmarks:
         checkedbenchmarks = Benchmark.objects.filter(default_on_comparison=True)
 
@@ -373,11 +391,13 @@ def comparison(request):
         selectedchart = settings.CHART_TYPE
 
     selectedbaseline = "none"
-    if 'bas' in data and data['bas'] in exekeys:
-        selectedbaseline = data['bas']
-    elif 'bas' in data:
-        # bas is present but is none
-        pass
+    if 'bas' in data:
+        bas = _normalize_exe_key(data['bas'])
+        if bas in exekeys:
+            selectedbaseline = bas
+        elif '@' in bas and bas.split('@')[0] in exekeys:
+            selectedbaseline = bas  # cross-env baseline: {exe_key}@{env_id}
+        # else: bas=none or unrecognised — skip NORMALIZATION default below
     elif (len(exekeys) > 1 and hasattr(settings, 'NORMALIZATION') and
             settings.NORMALIZATION):
         try:

@@ -16,6 +16,10 @@ var COLORS = [
 ];
 function getColor(i) { return COLORS[i % COLORS.length]; }
 
+function getExeLabel(key) {
+    return $("label[for='exe_" + key.replace(/:/g, '\\:') + "']").text().trim();
+}
+
 function getConfiguration() {
   return {
     exe: readCheckbox("input[name='executables']:checked"),
@@ -27,6 +31,86 @@ function getConfiguration() {
   };
 }
 
+function updateGraphTitle(exes, enviros, bens, baseline, chart, chartTitles) {
+    var $title = $("#graph-title");
+
+    if (enviros.length === 1 && exes.length === 2 && baseline !== "none" &&
+            chart !== "stacked bars" && compdata) {
+
+        var baselineExe = baseline, baselineEnv = null;
+        if (baseline.indexOf('@') !== -1) {
+            var bparts = baseline.split('@');
+            baselineExe = bparts[0];
+            baselineEnv = bparts[1];
+        }
+
+        var otherExes = exes.filter(function(e) { return e !== baselineExe; });
+        if (otherExes.length === 1) {
+            var otherExe = otherExes[0];
+            var envId = enviros[0];
+            var envForBase = baselineEnv !== null ? baselineEnv : envId;
+
+            var product = 1, count = 0;
+            for (var b = 0; b < bens.length; b++) {
+                var val = compdata[otherExe] && compdata[otherExe][envId]
+                    ? compdata[otherExe][envId][bens[b]]
+                    : null;
+                var baseval = compdata[baselineExe] && compdata[baselineExe][envForBase]
+                    ? compdata[baselineExe][envForBase][bens[b]]
+                    : null;
+                if (val !== null && baseval !== null && baseval !== 0 && val > 0) {
+                    product *= val / baseval;
+                    count++;
+                }
+            }
+
+            if (count > 0) {
+                var geomean = Math.pow(product, 1 / count);
+
+                var lessCount = 0, moreCount = 0;
+                var benSet = {};
+                for (var b = 0; b < bens.length; b++) { benSet[bens[b]] = true; }
+                for (var u in bench_units) {
+                    var unitBens = bench_units[u][0];
+                    var unitLess = bench_units[u][1].indexOf("less") !== -1;
+                    for (var ub = 0; ub < unitBens.length; ub++) {
+                        if (benSet[unitBens[ub]]) {
+                            if (unitLess) { lessCount++; } else { moreCount++; }
+                        }
+                    }
+                }
+
+                var otherLabel = getExeLabel(otherExe);
+                var baselineLabel = getExeLabel(baselineExe);
+                if (baselineEnv !== null) {
+                    baselineLabel += ' @ ' + $("label[for='env_" + baselineEnv + "']").text().trim();
+                }
+
+                var suffix;
+                if (moreCount === 0 && lessCount > 0) {
+                    suffix = geomean < 1
+                        ? ' or <strong>' + (1 / geomean).toFixed(1) + '&times;</strong> faster'
+                        : ' or <strong>' + geomean.toFixed(1) + '&times;</strong> slower';
+                } else if (lessCount === 0 && moreCount > 0) {
+                    suffix = geomean > 1
+                        ? ' or <strong>' + geomean.toFixed(1) + '&times;</strong> faster'
+                        : ' or <strong>' + (1 / geomean).toFixed(1) + '&times;</strong> slower';
+                } else {
+                    suffix = ' relative to baseline';
+                }
+
+                $title.html('The geometric average of ' + count + ' benchmarks for <strong>' +
+                    otherLabel + '</strong> is <strong>' + geomean.toFixed(2) + '</strong>' +
+                    suffix + ' than the baseline <strong>' + baselineLabel + '</strong>');
+                return;
+            }
+        }
+    }
+
+    // Fall back to the chart title(s)
+    $title.text(chartTitles.join(' / '));
+}
+
 function refreshContent() {
   var conf = getConfiguration(),
       exes = conf.exe.split(","),
@@ -34,6 +118,7 @@ function refreshContent() {
       enviros = conf.env.split(","),
       msg = "";
 
+  $("#graph-title").html("");
   var h = $("#plotwrapper").height();//get height for error message
   if (exes[0] === "") {
     $("#plotwrapper").html('<p class="warning">No executables selected</p>');
@@ -73,6 +158,7 @@ function refreshContent() {
   $("#plotwrapper").fadeOut("fast", function() {
     $(this).html(msg).show();
     var plotcounter = 1;
+    var chartTitles = [];
     for (var unit in bench_units) {
       var benchmarks = [];
       for (var ben in bens) {
@@ -85,8 +171,9 @@ function refreshContent() {
       var plotid = "plot" + plotcounter;
       $("#plotwrapper").append('<div class="compplot-wrap"><canvas id="' + plotid + '"></canvas></div>');
       plotcounter++;
-      renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, conf.bas, conf.chart, conf.hor);
+      chartTitles.push(renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, conf.bas, conf.chart, conf.hor));
     }
+    updateGraphTitle(exes, enviros, bens, conf.bas, conf.chart, chartTitles);
   });
 }
 
@@ -114,7 +201,7 @@ function updateBaselineDropdown() {
     if (multiEnv) {
       enviros.forEach(function(envId) {
         var envName = $("label[for='env_" + envId + "']").text().trim();
-        $baseline.append($('<option>').val(key + ':' + envId).text(name + ' @ ' + envName));
+        $baseline.append($('<option>').val(key + '@' + envId).text(name + ' @ ' + envName));
       });
     } else {
       $baseline.append($('<option>').val(key).text(name));
@@ -144,18 +231,18 @@ function loadData() {
 }
 
 function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline, chart, horizontal) {
-    // baseline may be "exe_key" or "exe_key:env_id" (for cross-env normalization)
+    // baseline may be "exe_key" or "exe_key@env_id" (for cross-env normalization)
     if (!baseline) { baseline = "none"; }
     var baselineExe = baseline, baselineEnv = null;
-    if (baseline !== "none" && baseline.indexOf(':') !== -1) {
-        var bparts = baseline.split(':');
+    if (baseline !== "none" && baseline.indexOf('@') !== -1) {
+        var bparts = baseline.split('@');
         baselineExe = bparts[0];
         baselineEnv = bparts[1];
     }
 
     var baselineLabel = "";
     if (baseline !== "none") {
-        baselineLabel = $("label[for='exe_" + baselineExe + "']").text().trim();
+        baselineLabel = getExeLabel(baselineExe);
         if (baselineEnv !== null) {
             baselineLabel += ' @ ' + $("label[for='env_" + baselineEnv + "']").text().trim();
         }
@@ -187,7 +274,7 @@ function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline,
         }
         for (var i = 0; i < exes.length; i++) {
             for (var j = 0; j < enviros.length; j++) {
-                var exeLabel = $("label[for='exe_" + exes[i] + "']").text().trim();
+                var exeLabel = getExeLabel(exes[i]);
                 if (chart === "relative bars" && exes[i] === baselineExe &&
                         (baselineEnv === null || baselineEnv === enviros[j])) { continue; }
                 var data = [];
@@ -218,7 +305,7 @@ function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline,
         // Labels = exe@env names
         for (var i = 0; i < exes.length; i++) {
             for (var j = 0; j < enviros.length; j++) {
-                var exeLabel = $("label[for='exe_" + exes[i] + "']").text().trim();
+                var exeLabel = getExeLabel(exes[i]);
                 labels.push(exeLabel + (enviros.length > 1 ? " @ " + $("label[for='env_" + enviros[j] + "']").text().trim() : ""));
             }
         }
@@ -286,7 +373,7 @@ function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline,
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                title: {display: true, text: title, font: {size: 15}},
+                title: {display: false},
                 tooltip: {position: 'cursor'},
                 legend: {
                     position: 'right',
@@ -318,6 +405,7 @@ function renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, baseline,
         }
     });
     chartInstances.push(instance);
+    return title;
 }
 
 function init(defaults) {
@@ -371,7 +459,39 @@ function init(defaults) {
     loadData();
 
     $("#permalink").click(function() {
-        window.location = "?" + $.param(getConfiguration());
+        var conf = getConfiguration();
+        var $all = $("input[name='benchmarks']");
+        var $checked = $("input[name='benchmarks']:checked");
+        if ($all.length > 0 && $all.length === $checked.length) {
+            conf.ben = 'all';
+        } else {
+            // Tally checked vs total per source
+            var sources = {};
+            $all.each(function() {
+                var src = $(this).data('source');
+                if (!sources[src]) { sources[src] = {total: 0, checked: 0}; }
+                sources[src].total++;
+                if ($(this).is(':checked')) { sources[src].checked++; }
+            });
+            var full = Object.keys(sources).filter(function(s) {
+                return sources[s].checked === sources[s].total;
+            });
+            var empty = Object.keys(sources).filter(function(s) {
+                return sources[s].checked === 0;
+            });
+            // Use source aliases only when every source is either fully selected or fully empty
+            if (full.length + empty.length === Object.keys(sources).length && full.length > 0) {
+                conf.ben = full.join(',');
+            }
+        }
+        var qs = Object.keys(conf).map(function(k) {
+            return k + '=' + encodeURIComponent(String(conf[k]))
+                .replace(/%2C/gi, ',')
+                .replace(/%3A/gi, ':')
+                .replace(/%40/gi, '@')
+                .replace(/%20/g, '+');
+        }).join('&');
+        window.location = '?' + qs;
     });
 
     $("#exportcsv").click(function(e) {
@@ -386,7 +506,7 @@ function init(defaults) {
         var header = ["benchmark"];
         for (var i = 0; i < exes.length; i++) {
             for (var j = 0; j < enviros.length; j++) {
-                var exeLabel = $("label[for='exe_" + exes[i] + "']").text().trim();
+                var exeLabel = getExeLabel(exes[i]);
                 var envLabel = $("label[for='env_" + enviros[j] + "']").text().trim();
                 header.push(enviros.length > 1 ? exeLabel + "@" + envLabel : exeLabel);
             }

@@ -418,7 +418,7 @@ def comparison(request):
                 proj = Project.objects.get(name=exe_spec['project'])
                 exe = Executable.objects.get(name=exe_spec['name'], project=proj)
                 for key in exekeys:
-                    if key.startswith(str(exe.id) + "+L+") and key in checkedexecutables:
+                    if key.startswith(str(exe.id) + ":L:") and key in checkedexecutables:
                         selectedbaseline = key
                         break
             except (Executable.DoesNotExist, Project.DoesNotExist):

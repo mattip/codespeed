@@ -1,3 +1,4 @@
+
 var Comparison = (function(window){
 
 // Localize globals
@@ -17,7 +18,9 @@ var COLORS = [
 function getColor(i) { return COLORS[i % COLORS.length]; }
 
 function getExeLabel(key) {
-    return $("label[for='exe_" + key.replace(/:/g, '\\:') + "']").text().trim();
+    return $("input[name='executables']")
+        .filter(function() { return $(this).val() === key; })
+        .next('label').text().trim();
 }
 
 function getConfiguration() {
@@ -34,76 +37,103 @@ function getConfiguration() {
 function updateGraphTitle(exes, enviros, bens, baseline, chart, chartTitles) {
     var $title = $("#graph-title");
 
-    if (enviros.length === 1 && exes.length === 2 && baseline !== "none" &&
-            chart !== "stacked bars" && compdata) {
+    var isPair = (exes.length === 2 && enviros.length === 1) ||
+                 (exes.length === 1 && enviros.length === 2);
+    if (isPair && chart !== "stacked bars" && compdata) {
+        // Resolve which (exe, env) pair is "other" vs "base"
+        var otherExe, otherEnv, baselineExe, baselineEnv;
 
-        var baselineExe = baseline, baselineEnv = null;
-        if (baseline.indexOf('@') !== -1) {
-            var bparts = baseline.split('@');
-            baselineExe = bparts[0];
-            baselineEnv = bparts[1];
-        }
-
-        var otherExes = exes.filter(function(e) { return e !== baselineExe; });
-        if (otherExes.length === 1) {
-            var otherExe = otherExes[0];
-            var envId = enviros[0];
-            var envForBase = baselineEnv !== null ? baselineEnv : envId;
-
-            var product = 1, count = 0;
-            for (var b = 0; b < bens.length; b++) {
-                var val = compdata[otherExe] && compdata[otherExe][envId]
-                    ? compdata[otherExe][envId][bens[b]]
-                    : null;
-                var baseval = compdata[baselineExe] && compdata[baselineExe][envForBase]
-                    ? compdata[baselineExe][envForBase][bens[b]]
-                    : null;
-                if (val !== null && baseval !== null && baseval !== 0 && val > 0) {
-                    product *= val / baseval;
-                    count++;
-                }
-            }
-
-            if (count > 0) {
-                var geomean = Math.pow(product, 1 / count);
-
-                var lessCount = 0, moreCount = 0;
-                var benSet = {};
-                for (var b = 0; b < bens.length; b++) { benSet[bens[b]] = true; }
-                for (var u in bench_units) {
-                    var unitBens = bench_units[u][0];
-                    var unitLess = bench_units[u][1].indexOf("less") !== -1;
-                    for (var ub = 0; ub < unitBens.length; ub++) {
-                        if (benSet[unitBens[ub]]) {
-                            if (unitLess) { lessCount++; } else { moreCount++; }
-                        }
-                    }
-                }
-
-                var otherLabel = getExeLabel(otherExe);
-                var baselineLabel = getExeLabel(baselineExe);
-                if (baselineEnv !== null) {
-                    baselineLabel += ' @ ' + $("label[for='env_" + baselineEnv + "']").text().trim();
-                }
-
-                var suffix;
-                if (moreCount === 0 && lessCount > 0) {
-                    suffix = geomean < 1
-                        ? ' or <strong>' + (1 / geomean).toFixed(1) + '&times;</strong> faster'
-                        : ' or <strong>' + geomean.toFixed(1) + '&times;</strong> slower';
-                } else if (lessCount === 0 && moreCount > 0) {
-                    suffix = geomean > 1
-                        ? ' or <strong>' + geomean.toFixed(1) + '&times;</strong> faster'
-                        : ' or <strong>' + (1 / geomean).toFixed(1) + '&times;</strong> slower';
-                } else {
-                    suffix = ' relative to baseline';
-                }
-
-                $title.html('The geometric average of ' + count + ' benchmarks for <strong>' +
-                    otherLabel + '</strong> is <strong>' + geomean.toFixed(2) + '</strong>' +
-                    suffix + ' than the baseline <strong>' + baselineLabel + '</strong>');
+        if (exes.length === 1 && enviros.length === 2) {
+            // Same exe, two environments — only show geomean when an explicit baseline env is set
+            if (baseline === "none") {
+                $title.text(chartTitles.join(' / '));
                 return;
             }
+            otherExe = exes[0];
+            baselineExe = exes[0];
+            if (baseline.indexOf('@') !== -1) {
+                var bparts = baseline.split('@');
+                baselineEnv = bparts[1];
+                otherEnv = enviros.filter(function(e) { return e !== baselineEnv; })[0] || enviros[1];
+            } else {
+                baselineEnv = enviros[0];
+                otherEnv = enviros[1];
+            }
+        } else {
+            // Two exes, one environment
+            otherEnv = enviros[0];
+            baselineEnv = null;
+            if (baseline !== "none" && baseline.indexOf('@') !== -1) {
+                var bparts = baseline.split('@');
+                baselineExe = bparts[0];
+                baselineEnv = bparts[1];
+            } else if (baseline !== "none") {
+                baselineExe = baseline;
+            } else {
+                baselineExe = exes[0];
+            }
+            otherExe = exes.filter(function(e) { return e !== baselineExe; })[0];
+            if (!otherExe) { otherExe = exes[1]; }
+        }
+
+        var envForBase = baselineEnv !== null ? baselineEnv : otherEnv;
+
+        var product = 1, count = 0;
+        for (var b = 0; b < bens.length; b++) {
+            var val = compdata[otherExe] && compdata[otherExe][otherEnv]
+                ? compdata[otherExe][otherEnv][bens[b]]
+                : null;
+            var baseval = compdata[baselineExe] && compdata[baselineExe][envForBase]
+                ? compdata[baselineExe][envForBase][bens[b]]
+                : null;
+            if (val !== null && baseval !== null && baseval !== 0 && val > 0) {
+                product *= val / baseval;
+                count++;
+            }
+        }
+
+        if (count > 0) {
+            var geomean = Math.pow(product, 1 / count);
+
+            var lessCount = 0, moreCount = 0;
+            var benSet = {};
+            for (var b = 0; b < bens.length; b++) { benSet[bens[b]] = true; }
+            for (var u in bench_units) {
+                var unitBens = bench_units[u][0];
+                var unitLess = bench_units[u][1].indexOf("less") !== -1;
+                for (var ub = 0; ub < unitBens.length; ub++) {
+                    if (benSet[unitBens[ub]]) {
+                        if (unitLess) { lessCount++; } else { moreCount++; }
+                    }
+                }
+            }
+
+            var otherLabel = getExeLabel(otherExe);
+            var baselineLabel = getExeLabel(baselineExe);
+            if (exes.length === 1) {
+                otherLabel += ' @ ' + $("label[for='env_" + otherEnv + "']").text().trim();
+                baselineLabel += ' @ ' + $("label[for='env_" + envForBase + "']").text().trim();
+            } else if (baselineEnv !== null) {
+                baselineLabel += ' @ ' + $("label[for='env_" + baselineEnv + "']").text().trim();
+            }
+
+            var suffix;
+            if (moreCount === 0 && lessCount > 0) {
+                suffix = geomean < 1
+                    ? ' or <strong>' + (1 / geomean).toFixed(1) + '&times;</strong> faster'
+                    : ' or <strong>' + geomean.toFixed(1) + '&times;</strong> slower';
+            } else if (lessCount === 0 && moreCount > 0) {
+                suffix = geomean > 1
+                    ? ' or <strong>' + geomean.toFixed(1) + '&times;</strong> faster'
+                    : ' or <strong>' + (1 / geomean).toFixed(1) + '&times;</strong> slower';
+            } else {
+                suffix = ' relative to baseline';
+            }
+
+            $title.html('The geometric average of ' + count + ' benchmarks for <strong>' +
+                otherLabel + '</strong> is <strong>' + geomean.toFixed(2) + '</strong>' +
+                suffix + ' than the baseline <strong>' + baselineLabel + '</strong>');
+            return;
         }
     }
 
@@ -171,7 +201,8 @@ function refreshContent() {
       var plotid = "plot" + plotcounter;
       $("#plotwrapper").append('<div class="compplot-wrap"><canvas id="' + plotid + '"></canvas></div>');
       plotcounter++;
-      chartTitles.push(renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, conf.bas, conf.chart, conf.hor));
+      var t = renderComparisonPlot(plotid, unit, benchmarks, exes, enviros, conf.bas, conf.chart, conf.hor);
+      chartTitles.push(t);
     }
     updateGraphTitle(exes, enviros, bens, conf.bas, conf.chart, chartTitles);
   });
@@ -207,7 +238,7 @@ function updateBaselineDropdown() {
       $baseline.append($('<option>').val(key).text(name));
     }
   });
-  if ($baseline.find("option[value='" + current + "']").length) {
+  if ($baseline.find("option").filter(function() { return $(this).val() === current; }).length) {
     $baseline.val(current);
   } else {
     $baseline.val('none');

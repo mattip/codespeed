@@ -90,13 +90,12 @@ STATICFILES_DIRS = (
 SHOW_REPORTS = False
 SHOW_HISTORICAL = True
 DEF_BASELINES = [
-                 {'executable': 'cpython', 'revision': '3.11.9'},
-                 {'executable': 'cpython', 'revision': '3.12.4'},
+                 {'executable': 'cpython', 'revision': '3.11.15'},
                 ]
 DEF_EXECUTABLES = [
                    {'name': 'pypy3.11-jit-64', 'project': 'PyPy3.11'},
                   ]
-DEF_ENVIRONMENT = 'benchmarker'
+DEF_ENVIRONMENT = 'benchmarker2'
 CHART_ORIENTATION = 'horizontal'
 DEF_BENCHMARK = 'grid'
 

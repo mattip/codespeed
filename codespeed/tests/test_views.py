@@ -383,7 +383,7 @@ class TestTimeline(TestCase):
         path = reverse('gettimelinedata')
         data = {
             "exe": "1,2",
-            "base": "2+4",
+            "base": "2:4",
             "ben": "float",
             "env": "1",
             "revs": "2"

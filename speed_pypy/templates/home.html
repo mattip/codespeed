@@ -102,6 +102,7 @@
         $('#geofaster').html((1 / trunk_geomean).toFixed(1));
 
         // Plot 1: per-benchmark normalized comparison
+        // Needs to be kept in sync with the plot in embed_comparison.html
         var wrap1 = document.getElementById('baseline-comparison-plot');
         var canvas1 = document.createElement('canvas');
         wrap1.appendChild(canvas1);

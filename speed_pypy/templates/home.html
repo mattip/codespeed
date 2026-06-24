@@ -29,7 +29,10 @@
   {% if show_historical %}
   <div id="historical">
     <h3>How fast is {{ default_exe.project }}?</h3>
-    <div id="baseline-comparison-plot" style="position:relative;height:400px;"></div>
+    <iframe src="{% url 'embed-comparison' %}"
+            title="{{ default_exe.project }} ({{ default_exe }}) vs {{ baseline }} benchmark comparison"
+            style="border:0;width:100%;height:400px"
+            loading="lazy"></iframe>
     <p class="plot-caption">Plot 1: The above plot represents {{ default_exe.project }} ({{ default_exe }}) benchmark times normalized to {{ baseline }}. Smaller is better.</p>
     <p>It depends greatly on the type of task being performed. The geometric average of all benchmarks is <span id="geomean"></span> or <strong id="geofaster"></strong> times <em>faster</em> than {{ baseline }}</p>
 
@@ -68,15 +71,15 @@
 
     function renderplot(data) {
         if (data === null || data.length === 0) {
-            $("#baseline-comparison-plot").html(getLoadText('Error retrieving data', 0));
+            $("#historical-plot").html(getLoadText('Error retrieving data', 0));
             return;
         }
         if (typeof data === 'string' || data instanceof String) {
-            $("#baseline-comparison-plot").html(getLoadText('Error retrieving data ' + data, 0));
+            $("#historical-plot").html(getLoadText('Error retrieving data ' + data, 0));
             return;
         }
 
-        var benchmarks = [], latestValues = [], baselineValues = [];
+        var latestValues = [];
         var trunk_geomean = 1;
         var tagged_data = [];
         for (var i in data['tagged_revs']) { tagged_data[i] = []; }
@@ -90,10 +93,8 @@
                 tagged_data[i].push(data['results'][benchname][rev] / data['results'][benchname][data['baseline']]);
             }
             if (!add_to_tagged_data) { continue; }
-            benchmarks.push(benchname);
             var rel = data['results'][benchname]['latest'] / data['results'][benchname][data['baseline']];
             latestValues.push(rel);
-            baselineValues.push(1.0);
             if (rel > 0 && !isNaN(rel)) { trunk_geomean *= rel; }
         }
 
@@ -101,34 +102,8 @@
         $('#geomean').html(trunk_geomean.toFixed(2));
         $('#geofaster').html((1 / trunk_geomean).toFixed(1));
 
-        // Plot 1: per-benchmark normalized comparison
-        var wrap1 = document.getElementById('baseline-comparison-plot');
-        var canvas1 = document.createElement('canvas');
-        wrap1.appendChild(canvas1);
-        new Chart(canvas1, {
-            type: 'bar',
-            data: {
-                labels: benchmarks,
-                datasets: [
-                    {label: 'latest {{ default_exe }}', data: latestValues, backgroundColor: '#4e79a7'},
-                    {label: data['baseline'], data: baselineValues, type: 'line',
-                     borderColor: '#f28e2b', backgroundColor: 'transparent',
-                     pointRadius: 0, borderWidth: 2, fill: false}
-                ]
-            },
-            options: {
-                animation: false,
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    tooltip: {position: 'cursor'}
-                },
-                scales: {
-                    x: {ticks: {maxRotation: 70, minRotation: 70, autoSkip: false, font: {size: 11}}},
-                    y: {min: 0, max: 2.0, ticks: {callback: function(v) { return v.toFixed(2); }}}
-                }
-            }
-        });
+        // Plot 1 (per-benchmark normalized comparison) is rendered by the
+        // embed_comparison page shown in the iframe above.
 
         // Plot 2: geomean speedup over tagged revisions
         var geomeans = [1.0];

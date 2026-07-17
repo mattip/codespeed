@@ -197,8 +197,7 @@ class TestAddResult(TestCase):
         self.assertEqual(b.source, 'legacy')
 
     def test_same_name_different_source_are_distinct(self):
-        """The same name in a different suite is a separate Benchmark, so
-        results are not merged across suites."""
+        """The same name in a different suite is a separate Benchmark"""
         self.client.post(self.path, self.data)
         modified_data = copy.deepcopy(self.data)
         modified_data['source'] = 'pyperformance'
@@ -207,7 +206,6 @@ class TestAddResult(TestCase):
         legacy = Benchmark.objects.get(name='float', source='legacy')
         pyperf = Benchmark.objects.get(name='float', source='pyperformance')
         self.assertNotEqual(legacy.pk, pyperf.pk)
-        # each benchmark owns its own result, nothing merged onto the other
         self.assertEqual(legacy.results.count(), 1)
         self.assertEqual(pyperf.results.count(), 1)
 
@@ -218,6 +216,14 @@ class TestAddResult(TestCase):
         response = self.client.post(self.path, modified_data)
         self.assertEqual(response.status_code, 400)
         self.assertFalse(Benchmark.objects.filter(name='float').exists())
+
+    def test_sentinel_value_rejected(self):
+        """A failed-run sentinel value is rejected"""
+        modified_data = copy.deepcopy(self.data)
+        modified_data['result_value'] = 1000000
+        response = self.client.post(self.path, modified_data)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Result.objects.filter(benchmark__name='float').exists())
 
 
 @override_settings(ALLOW_ANONYMOUS_POST=True)

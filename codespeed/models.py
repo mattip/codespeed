@@ -196,17 +196,9 @@ class Benchmark(models.Model):
         "Default on comparison page", default=True)
 
     class Meta:
-        # The same benchmark name can exist in more than one suite
-        # (e.g. 'nbody' in both the legacy and pyperformance suites);
-        # source is part of the identity so results don't get merged.
         unique_together = (('name', 'source'),)
 
     def ident(self):
-        """Stable identifier used in timeline URLs/permalinks.
-
-        A bare name (no ``.source`` suffix) is treated as 'legacy' when
-        parsed back, so old ``?ben=<name>`` permalinks keep working.
-        """
         return "%s.%s" % (self.name, self.source)
 
     def __str__(self):

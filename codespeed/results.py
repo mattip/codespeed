@@ -12,6 +12,9 @@ from . import commits
 
 logger = logging.getLogger(__name__)
 
+# failed runs are recorded with a huge value; anything this big is bogus
+SENTINEL_THRESHOLD = 1000000
+
 
 def validate_result(item):
     """
@@ -38,11 +41,17 @@ def validate_result(item):
         elif key in item and item[key] == "":
             return 'Value for key "' + key + '" empty in request', error
 
-    # source is optional but, when given, must be a known suite. It is part
-    # of the Benchmark identity, so an unvalidated value would silently
-    # create a bogus benchmark row via get_or_create.
     if 'source' in item and item['source'] not in dict(Benchmark.S_TYPES):
         return 'Invalid source "%s"' % item['source'], error
+
+    try:
+        result_value = float(item['result_value'])
+    except (TypeError, ValueError):
+        return 'Value for key "result_value" is not a number', error
+    if result_value >= SENTINEL_THRESHOLD:
+        return ('Result value %s rejected: at or above the failed-run '
+                'sentinel threshold (%s)' % (
+                    item['result_value'], SENTINEL_THRESHOLD), error)
 
     # Check that the Environment exists
     try:
@@ -64,8 +73,6 @@ def save_result(data, update_repo=True):
     p, created = Project.objects.get_or_create(name=data["project"])
     branch, created = Branch.objects.get_or_create(name=data["branch"],
                                                    project=p)
-    # source is part of the benchmark identity: the same name in a different
-    # suite is a distinct benchmark, so results are never merged across suites.
     source = data.get("source", "legacy")
     b, created = Benchmark.objects.get_or_create(
         name=data["benchmark"], source=source)

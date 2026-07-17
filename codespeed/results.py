@@ -38,6 +38,12 @@ def validate_result(item):
         elif key in item and item[key] == "":
             return 'Value for key "' + key + '" empty in request', error
 
+    # source is optional but, when given, must be a known suite. It is part
+    # of the Benchmark identity, so an unvalidated value would silently
+    # create a bogus benchmark row via get_or_create.
+    if 'source' in item and item['source'] not in dict(Benchmark.S_TYPES):
+        return 'Invalid source "%s"' % item['source'], error
+
     # Check that the Environment exists
     try:
         e = Environment.objects.get(name=item['environment'])
@@ -58,7 +64,11 @@ def save_result(data, update_repo=True):
     p, created = Project.objects.get_or_create(name=data["project"])
     branch, created = Branch.objects.get_or_create(name=data["branch"],
                                                    project=p)
-    b, created = Benchmark.objects.get_or_create(name=data["benchmark"])
+    # source is part of the benchmark identity: the same name in a different
+    # suite is a distinct benchmark, so results are never merged across suites.
+    source = data.get("source", "legacy")
+    b, created = Benchmark.objects.get_or_create(
+        name=data["benchmark"], source=source)
 
     if created:
         if "description" in data:
@@ -69,8 +79,6 @@ def save_result(data, update_repo=True):
             b.units_title = data["units_title"]
         if "lessisbetter" in data:
             b.lessisbetter = data["lessisbetter"]
-        if "source" in data:
-            b.source = data["source"]
         b.full_clean()
         b.save()
 

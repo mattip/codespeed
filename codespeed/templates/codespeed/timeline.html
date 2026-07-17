@@ -65,13 +65,16 @@
       <label for="b_show_none">Display none</label>
     </li>
   </ul>{% endif %}
-  <ul>{% for bench in benchmarks|dictsort:"name" %}
+  {% regroup benchmarks by get_source_display as benchmark_groups %}
+  {% for group in benchmark_groups %}
+  <ul><a href="#" class="togglefold">{{ group.grouper }}</a>
+    {% for bench in group.list|dictsort:"name" %}
     <li title="{{ bench.description }}">
-      <input id="benchmark_{{ bench.id }}" type="radio" name="benchmark" value="{{ bench.name }}" />
+      <input id="benchmark_{{ bench.id }}" type="radio" name="benchmark" value="{{ bench.ident }}" />
       <label for="benchmark_{{ bench.id }}">{{ bench }}</label>
     </li>
     {% endfor %}
-  </ul>
+  </ul>{% endfor %}
   </div>
 </div>
 </div>
@@ -120,7 +123,7 @@
       baseline: "{{ defaultbaseline }}",
       executables: [{% for exe in checkedexecutables %}{{ exe.id }}, {% endfor %}],
       branches: [{% for b in branch_list %}"{{ branch }}", {% endfor %}],
-      benchmark: "{{ defaultbenchmark }}",
+      benchmark: "{{ defaultbenchmark_value }}",
       environments: [{% for env in defaultenvironments %}{{ env.id }}, {% endfor %}],
       equidistant: "{{ defaultequid }}",
       quartiles: "{{ defaultquarts }}",

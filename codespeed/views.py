@@ -25,7 +25,7 @@ from .models import (Environment, Report, Project, Revision, Result,
 from .views_data import (get_default_environment, getbaselineexecutables,
                          getdefaultexecutable, getcomparisonexes,
                          get_benchmark_results, get_num_revs_and_benchmarks,
-                         get_stats_with_defaults)
+                         get_stats_with_defaults, parse_benchmark_ident)
 from .results import save_result, create_report_if_enough_data
 from . import commits
 from .validators import validate_results_request
@@ -717,7 +717,9 @@ def timeline(request):
     baseline = getbaselineexecutables()
     defaultbaseline = None
     if len(baseline) > 1:
-        defaultbaseline = str(baseline[1]['executable'].id) + "+"
+        # must match the option keys built in getbaselineexecutables()
+        # ("<exe.id>:<rev.id>"), which gettimelinedata splits on ":"
+        defaultbaseline = str(baseline[1]['executable'].id) + ":"
         defaultbaseline += str(baseline[1]['revision'].id)
     if "base" in data and data['base'] != "undefined":
         try:
@@ -737,7 +739,9 @@ def timeline(request):
                 lastrevisions.append(revs_int)
             defaultlast = revs_int
 
-    benchmarks = Benchmark.objects.all()
+    # order by source so the timeline sidebar can {% regroup %} into
+    # per-suite accordion sections
+    benchmarks = Benchmark.objects.all().order_by('source', 'name')
 
     defaultbenchmark = "grid"
     if not len(benchmarks):
@@ -748,9 +752,10 @@ def timeline(request):
         if settings.DEF_BENCHMARK in ['grid', 'show_none']:
             defaultbenchmark = settings.DEF_BENCHMARK
         else:
+            def_name, def_source = parse_benchmark_ident(settings.DEF_BENCHMARK)
             try:
                 defaultbenchmark = Benchmark.objects.get(
-                    name=settings.DEF_BENCHMARK)
+                    name=def_name, source=def_source)
             except Benchmark.DoesNotExist:
                 pass
     elif len(benchmarks) >= get_setting('TIMELINE_GRID_LIMIT', 30):
@@ -760,7 +765,9 @@ def timeline(request):
         if data['ben'] == "show_none":
             defaultbenchmark = data['ben']
         else:
-            defaultbenchmark = get_object_or_404(Benchmark, name=data['ben'])
+            ben_name, ben_source = parse_benchmark_ident(data['ben'])
+            defaultbenchmark = get_object_or_404(
+                Benchmark, name=ben_name, source=ben_source)
 
     if 'equid' in data:
         defaultequid = data['equid']
@@ -785,12 +792,19 @@ def timeline(request):
     for proj in Project.objects.filter(track=True):
         executables[proj] = Executable.objects.filter(project=proj)
     use_median_bands = hasattr(settings, 'USE_MEDIAN_BANDS') and settings.USE_MEDIAN_BANDS
+    # The radio buttons carry 'name.source' idents, so the JS default must
+    # match that form (the 'grid'/'show_none' sentinels are passed through).
+    if isinstance(defaultbenchmark, Benchmark):
+        defaultbenchmark_value = defaultbenchmark.ident()
+    else:
+        defaultbenchmark_value = defaultbenchmark
     return render(request, 'codespeed/timeline.html', {
         'pagedesc': pagedesc,
         'checkedexecutables': checkedexecutables,
         'defaultbaseline': defaultbaseline,
         'baseline': baseline,
         'defaultbenchmark': defaultbenchmark,
+        'defaultbenchmark_value': defaultbenchmark_value,
         'defaultenvironment': defaultenviro,
         'defaultenvironments': defaultenvironments,
         'lastrevisions': lastrevisions,
@@ -921,9 +935,11 @@ def changes(request):
             pass
 
     baseline = getbaselineexecutables()
-    defaultbaseline = "+"
+    defaultbaseline = "none"
     if len(baseline) > 1:
-        defaultbaseline = str(baseline[1]['executable'].id) + "+"
+        # must match the "<exe.id>:<rev.id>" option keys from
+        # getbaselineexecutables()
+        defaultbaseline = str(baseline[1]['executable'].id) + ":"
         defaultbaseline += str(baseline[1]['revision'].id)
     if "base" in data and data['base'] != "undefined":
         try:

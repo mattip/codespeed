@@ -605,7 +605,15 @@ function setValuesOfInputFields(params) {
     });
 
     var benchmark = valueOrDefault(params.ben, defaults.benchmark);
-    $("input:radio[name='benchmark']").filter("[value='" + benchmark + "']").prop('checked', true);
+    var benchRadio = $("input:radio[name='benchmark']").filter("[value='" + benchmark + "']");
+    if (benchRadio.length === 0 && benchmark !== "grid" && benchmark !== "show_none") {
+        // backwards compat: a bare '<name>' permalink defaults to the legacy suite
+        benchmark = benchmark + ".legacy";
+        benchRadio = $("input:radio[name='benchmark']").filter("[value='" + benchmark + "']");
+    }
+    benchRadio.prop('checked', true);
+    // reveal the suite accordion section that holds the selected benchmark
+    benchRadio.closest("ul").show().children("a.togglefold").removeClass('folded');
 
     var envDefault = (defaults.environments || []).map(String).join(',');
     var envIds = valueOrDefault(params.env, envDefault).split(',').filter(Boolean);

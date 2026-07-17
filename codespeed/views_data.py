@@ -10,6 +10,20 @@ from codespeed.models import (
     Environment, Benchmark, Result)
 
 
+def parse_benchmark_ident(ben):
+    """Split a timeline ``ben`` value into (name, source).
+
+    Accepts ``<name>.<source>`` (e.g. 'nbody.pyperformance') and, for
+    backwards compatibility, a bare ``<name>`` which defaults to the
+    'legacy' source. Benchmark names may themselves contain dots, so only
+    a trailing segment that is a known source slug is treated as the source.
+    """
+    name, _, suffix = ben.rpartition('.')
+    if name and suffix in dict(Benchmark.S_TYPES):
+        return name, suffix
+    return ben, 'legacy'
+
+
 def get_default_environment(enviros, data, multi=False):
     """Returns the default environment. Preference level is:
         * Present in URL parameters (permalinks)
@@ -169,7 +183,8 @@ def get_benchmark_results(data):
     project = Project.objects.get(name=data['proj'])
     executable = Executable.objects.get(name=data['exe'], project=project)
     branch = Branch.objects.get(name=data['branch'], project=project)
-    benchmark = Benchmark.objects.get(name=data['ben'])
+    ben_name, ben_source = parse_benchmark_ident(data['ben'])
+    benchmark = Benchmark.objects.get(name=ben_name, source=ben_source)
 
     number_of_revs = int(data.get('revs', 10))
 
@@ -252,7 +267,9 @@ def get_num_revs_and_benchmarks(data):
         benchmarks = []
         number_of_revs = int(data.get('revs', 10))
     else:
-        benchmarks = [get_object_or_404(Benchmark, name=data['ben'])]
+        ben_name, ben_source = parse_benchmark_ident(data['ben'])
+        benchmarks = [get_object_or_404(
+            Benchmark, name=ben_name, source=ben_source)]
         number_of_revs = int(data.get('revs', 10))
     return number_of_revs, benchmarks
 

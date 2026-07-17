@@ -190,14 +190,34 @@ class TestAddResult(TestCase):
         b = Benchmark.objects.get(name='newbench')
         self.assertEqual(b.source, 'pyperformance')
 
-    def test_source_not_changed_on_existing_benchmark(self):
-        """source in the payload should not overwrite an existing Benchmark"""
+    def test_source_defaults_to_legacy(self):
+        """A payload without a source creates a 'legacy' Benchmark"""
+        self.client.post(self.path, self.data)
+        b = Benchmark.objects.get(name='float')
+        self.assertEqual(b.source, 'legacy')
+
+    def test_same_name_different_source_are_distinct(self):
+        """The same name in a different suite is a separate Benchmark, so
+        results are not merged across suites."""
         self.client.post(self.path, self.data)
         modified_data = copy.deepcopy(self.data)
         modified_data['source'] = 'pyperformance'
         self.client.post(self.path, modified_data)
-        b = Benchmark.objects.get(name='float')
-        self.assertEqual(b.source, 'legacy')
+
+        legacy = Benchmark.objects.get(name='float', source='legacy')
+        pyperf = Benchmark.objects.get(name='float', source='pyperformance')
+        self.assertNotEqual(legacy.pk, pyperf.pk)
+        # each benchmark owns its own result, nothing merged onto the other
+        self.assertEqual(legacy.results.count(), 1)
+        self.assertEqual(pyperf.results.count(), 1)
+
+    def test_invalid_source_rejected(self):
+        """An unknown source is rejected instead of creating a bogus row"""
+        modified_data = copy.deepcopy(self.data)
+        modified_data['source'] = 'bogus'
+        response = self.client.post(self.path, modified_data)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Benchmark.objects.filter(name='float').exists())
 
 
 @override_settings(ALLOW_ANONYMOUS_POST=True)

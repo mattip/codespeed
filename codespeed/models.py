@@ -181,7 +181,7 @@ class Benchmark(models.Model):
         ('M', 'Median'),
     )
 
-    name = models.CharField(unique=True, max_length=100)
+    name = models.CharField(max_length=100)
     parent = models.ForeignKey(
         'self', on_delete=models.CASCADE, verbose_name="parent",
         help_text="allows to group benchmarks in hierarchies",
@@ -194,6 +194,20 @@ class Benchmark(models.Model):
     lessisbetter = models.BooleanField("Less is better", default=True)
     default_on_comparison = models.BooleanField(
         "Default on comparison page", default=True)
+
+    class Meta:
+        # The same benchmark name can exist in more than one suite
+        # (e.g. 'nbody' in both the legacy and pyperformance suites);
+        # source is part of the identity so results don't get merged.
+        unique_together = (('name', 'source'),)
+
+    def ident(self):
+        """Stable identifier used in timeline URLs/permalinks.
+
+        A bare name (no ``.source`` suffix) is treated as 'legacy' when
+        parsed back, so old ``?ben=<name>`` permalinks keep working.
+        """
+        return "%s.%s" % (self.name, self.source)
 
     def __str__(self):
         return self.name

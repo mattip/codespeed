@@ -12,7 +12,7 @@ import sqlite3
 from datetime import datetime
 
 from django.core.management.base import BaseCommand, CommandError
-from django.db import connection
+from django.db import connection, transaction
 
 # Columns that are stored as 0/1 integers in SQLite but need Python bools
 # for PostgreSQL's boolean type.
@@ -66,7 +66,7 @@ class Command(BaseCommand):
 
         src.row_factory = sqlite3.Row
 
-        with connection.cursor() as cur:
+        with transaction.atomic(), connection.cursor() as cur:
             for table in _TABLES:
                 bool_cols = _BOOL_COLS.get(table, set())
                 dt_cols = _DT_COLS.get(table, set())

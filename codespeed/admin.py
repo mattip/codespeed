@@ -85,10 +85,16 @@ class EnvironmentAdmin(admin.ModelAdmin):
 
 @admin.register(Result)
 class ResultAdmin(admin.ModelAdmin):
-    list_display = ('revision', 'benchmark', 'executable', 'environment',
-                    'value', 'date')
-    list_filter = ('environment', 'executable', 'date', 'benchmark')
+    list_display = ('revision', 'benchmark', 'source', 'executable',
+                    'environment', 'value', 'date')
+    list_filter = ('environment', 'executable', 'date', 'benchmark__source',
+                   'benchmark')
+    list_select_related = ('revision', 'benchmark', 'executable', 'environment')
     raw_id_fields = ('revision', 'benchmark', 'executable', 'environment')
+
+    @admin.display(ordering='benchmark__source', description='Source')
+    def source(self, obj):
+        return obj.benchmark.source
 
 
 def recalculate_report(modeladmin, request, queryset):

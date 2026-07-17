@@ -388,9 +388,9 @@ def comparison(request):
             units = unit_qs[0].units
             lessisbetter = (unit_qs[0].lessisbetter and
                             ' (less is better)' or ' (more is better)')
-            bench_units[unit] = [
-                [b.id for b in unit_qs], lessisbetter, units
-            ]
+            # a units_title (e.g. 'Time') can span sources: accumulate, don't overwrite
+            entry = bench_units.setdefault(unit, [[], lessisbetter, units])
+            entry[0].extend(b.id for b in unit_qs)
     checkedbenchmarks = []
     if 'ben' in data:
         checkedbenchmarks = _parse_ben_param(data['ben'])
@@ -717,8 +717,7 @@ def timeline(request):
     baseline = getbaselineexecutables()
     defaultbaseline = None
     if len(baseline) > 1:
-        # must match the option keys built in getbaselineexecutables()
-        # ("<exe.id>:<rev.id>"), which gettimelinedata splits on ":"
+        # must match the "<exe.id>:<rev.id>" option keys from getbaselineexecutables()
         defaultbaseline = str(baseline[1]['executable'].id) + ":"
         defaultbaseline += str(baseline[1]['revision'].id)
     if "base" in data and data['base'] != "undefined":
@@ -739,8 +738,6 @@ def timeline(request):
                 lastrevisions.append(revs_int)
             defaultlast = revs_int
 
-    # order by source so the timeline sidebar can {% regroup %} into
-    # per-suite accordion sections
     benchmarks = Benchmark.objects.all().order_by('source', 'name')
 
     defaultbenchmark = "grid"
@@ -792,8 +789,6 @@ def timeline(request):
     for proj in Project.objects.filter(track=True):
         executables[proj] = Executable.objects.filter(project=proj)
     use_median_bands = hasattr(settings, 'USE_MEDIAN_BANDS') and settings.USE_MEDIAN_BANDS
-    # The radio buttons carry 'name.source' idents, so the JS default must
-    # match that form (the 'grid'/'show_none' sentinels are passed through).
     if isinstance(defaultbenchmark, Benchmark):
         defaultbenchmark_value = defaultbenchmark.ident()
     else:
@@ -937,8 +932,7 @@ def changes(request):
     baseline = getbaselineexecutables()
     defaultbaseline = "none"
     if len(baseline) > 1:
-        # must match the "<exe.id>:<rev.id>" option keys from
-        # getbaselineexecutables()
+        # must match the "<exe.id>:<rev.id>" option keys from getbaselineexecutables()
         defaultbaseline = str(baseline[1]['executable'].id) + ":"
         defaultbaseline += str(baseline[1]['revision'].id)
     if "base" in data and data['base'] != "undefined":

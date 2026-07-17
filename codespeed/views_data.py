@@ -11,13 +11,7 @@ from codespeed.models import (
 
 
 def parse_benchmark_ident(ben):
-    """Split a timeline ``ben`` value into (name, source).
-
-    Accepts ``<name>.<source>`` (e.g. 'nbody.pyperformance') and, for
-    backwards compatibility, a bare ``<name>`` which defaults to the
-    'legacy' source. Benchmark names may themselves contain dots, so only
-    a trailing segment that is a known source slug is treated as the source.
-    """
+    """Split a '<name>.<source>' (or bare '<name>') into (name, source='legacy')."""
     name, _, suffix = ben.rpartition('.')
     if name and suffix in dict(Benchmark.S_TYPES):
         return name, suffix

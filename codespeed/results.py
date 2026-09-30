@@ -32,6 +32,7 @@ def validate_result(item):
         'benchmark',
         'environment',
         'result_value',
+        'source',
     ]
 
     error = True
@@ -41,7 +42,7 @@ def validate_result(item):
         elif key in item and item[key] == "":
             return 'Value for key "' + key + '" empty in request', error
 
-    if 'source' in item and item['source'] not in dict(Benchmark.S_TYPES):
+    if item['source'] not in dict(Benchmark.S_TYPES):
         return 'Invalid source "%s"' % item['source'], error
 
     try:
@@ -73,9 +74,8 @@ def save_result(data, update_repo=True):
     p, created = Project.objects.get_or_create(name=data["project"])
     branch, created = Branch.objects.get_or_create(name=data["branch"],
                                                    project=p)
-    source = data.get("source", "legacy")
     b, created = Benchmark.objects.get_or_create(
-        name=data["benchmark"], source=source)
+        name=data["benchmark"], source=data["source"])
 
     if created:
         if "description" in data:

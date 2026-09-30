@@ -79,6 +79,7 @@ def save(project, revision, results, executable, host, url, testing=False,
             'environment': host,
             'result_value': value,
             'branch': branch,
+            'source': 'legacy',
         }]
         if not value:
             print("Ignoring skipped result", data)

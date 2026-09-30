@@ -29,6 +29,7 @@ class TestAddResult(TestCase):
             'benchmark': 'float',
             'environment': 'Dual Core',
             'result_value': 456,
+            'source': 'legacy',
         }
 
     def test_add_correct_result(self):
@@ -190,11 +191,13 @@ class TestAddResult(TestCase):
         b = Benchmark.objects.get(name='newbench')
         self.assertEqual(b.source, 'pyperformance')
 
-    def test_source_defaults_to_legacy(self):
-        """A payload without a source creates a 'legacy' Benchmark"""
-        self.client.post(self.path, self.data)
-        b = Benchmark.objects.get(name='float')
-        self.assertEqual(b.source, 'legacy')
+    def test_missing_source_rejected(self):
+        """A payload without a source is rejected instead of defaulting"""
+        modified_data = copy.deepcopy(self.data)
+        del modified_data['source']
+        response = self.client.post(self.path, modified_data)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Benchmark.objects.filter(name='float').exists())
 
     def test_same_name_different_source_are_distinct(self):
         """The same name in a different suite is a separate Benchmark"""
@@ -245,28 +248,32 @@ class TestAddJSONResults(TestCase):
              'executable': 'pypy-c',
              'benchmark': 'Richards',
              'environment': 'bigdog',
-             'result_value': 456},
+             'result_value': 456,
+             'source': 'legacy'},
             {'commitid': '456',
              'project': 'pypy',
              'branch': 'default',
              'executable': 'pypy-c',
              'benchmark': 'Richards',
              'environment': 'bigdog',
-             'result_value': 457},
+             'result_value': 457,
+             'source': 'legacy'},
             {'commitid': '456',
              'project': 'pypy',
              'branch': 'default',
              'executable': 'pypy-c',
              'benchmark': 'Richards2',
              'environment': 'bigdog',
-             'result_value': 34},
+             'result_value': 34,
+             'source': 'legacy'},
             {'commitid': '789',
              'project': 'pypy',
              'branch': 'default',
              'executable': 'pypy-c',
              'benchmark': 'Richards',
              'environment': 'bigdog',
-             'result_value': 458},
+             'result_value': 458,
+             'source': 'legacy'},
         ]
 
     def test_get_returns_405(self):
@@ -452,6 +459,7 @@ class TestReports(TestCase):
             'benchmark': 'float',
             'environment': 'Dual Core',
             'result_value': 200,
+            'source': 'legacy',
         }
         resp = self.client.post(reverse('add-result'),
                                 self.data)

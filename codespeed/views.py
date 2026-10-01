@@ -14,6 +14,7 @@ from django.http import HttpResponse, Http404, HttpResponseBadRequest, \
     HttpResponseNotFound, StreamingHttpResponse
 from django.db.models import F
 from django.shortcuts import get_object_or_404, render
+from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.clickjacking import xframe_options_exempt
@@ -112,7 +113,15 @@ def embed_comparison(request):
     return render(request, 'embed_comparison.html', context)
 
 
+# The historical comparison only changes when new results are saved, which
+# happens at most a few times a day, yet computing it costs ~2s of database
+# time per request.  Cache the rendered JSON server-side and let browsers
+# reuse it too.
+HISTORICAL_CACHE_SECONDS = 30 * 60
+
+
 @require_GET
+@cache_page(HISTORICAL_CACHE_SECONDS)
 def gethistoricaldata(request):
     # 'labels' maps each key in tagged_revs (plus baseline and 'latest') to
     # a two-line label [tag, project] for the x axis of the history chart.
